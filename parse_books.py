@@ -65,12 +65,18 @@ def parse_html_file(file_path):
     return books
 
 def main():
-    source_dir = r"D:\github\book-searcher"
-    target_json = r"d:\github\reading-finder\books.json"
+    # 以程式所在目錄為基準
+    source_dir = os.path.dirname(os.path.abspath(__file__))
+    target_json = os.path.join(source_dir, "books.json")
     
     # 尋找 books_page_*.html 但排除含有 _with_library 或 _rechecked 的檔案
     pattern = os.path.join(source_dir, "books_page_*.html")
     html_files = [f for f in glob.glob(pattern) if not ("_with_library" in f or "_rechecked" in f)]
+    
+    if not html_files:
+        print("\n[提示] 找不到任何 books_page_*.html 檔案。")
+        print("請將抓取下來的 HTML 書籍網頁檔案放至此專案目錄下（與 parse_books.py 同一層）再重新執行。")
+        return
     
     # 依頁數排序檔案以維持原本的順序
     def get_page_num(path):

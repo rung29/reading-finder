@@ -21,15 +21,16 @@
 
 ### 步驟一：解析爬蟲資料，更新書籍資料庫
 
-本系統的書籍資料來源為爬蟲下載的 HTML 檔（例如 `D:\github\book-searcher\books_page_*.html`）。
+本系統的書籍資料來源為爬取下載的 HTML 檔（即 `books_page_*.html` 格式）。
 若您有更新爬蟲資料，請在本機執行以下步驟重新產生 `books.json`：
 
-1. 開啟終端機並切換至此專案目錄。
-2. 執行解析腳本：
+1. 將您抓取的 `books_page_*.html` 檔案**複製並放置於此專案根目錄下**（即與 `parse_books.py` 同一層資料夾）。
+2. 開啟終端機並切換至此專案目錄。
+3. 執行解析腳本：
    ```bash
    python parse_books.py
    ```
-3. 執行後會讀取並合併 `D:\github\book-searcher\books_page_*.html` 的書籍表格內容，並更新專案內的 `books.json`。
+4. 執行後會自動搜尋並合併專案根目錄下的所有 `books_page_*.html` 書籍內容，並更新產出 `books.json`。若在此目錄中未找到任何 HTML 檔案，腳本會主動顯示提示資訊引導您放置檔案。
 
 ### 步驟二：本地測試與預覽
 
