@@ -1,0 +1,27 @@
+{
+  "short_name": "彰化認證查詢",
+  "name": "彰化閱讀線上認證書籍查詢系統",
+  "description": "提供手機快速查詢讀步彰化飛閱雲端認證書籍，支援拍照辨識與離線搜尋。",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any"
+    },
+    {
+      "src": "icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "index.html",
+  "background_color": "#0d1117",
+  "theme_color": "#1f2937",
+  "display": "standalone",
+  "orientation": "portrait"
+}

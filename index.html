@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="zh-TW" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>彰化閱讀線上認證書籍查詢系統</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+  <link rel="shortcut icon" href="icon.svg" type="image/svg+xml">
+  <!-- 引入模糊搜尋 Fuse.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/6.6.2/fuse.min.js"></script>
+  <!-- 引入中文 OCR Tesseract.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js"></script>
+</head>
+<body>
+  <div class="app-container">
+    <header>
+      <div class="logo">
+        <img src="icon.svg" alt="Logo">
+        <h1>彰化認證查詢</h1>
+      </div>
+      <button class="theme-toggle" id="theme-toggle" aria-label="切換主題">🌙</button>
+    </header>
+
+    <div class="offline-banner" id="offline-banner">目前處於離線狀態，已自動切換為離線搜尋模式</div>
+
+    <main class="glass-card">
+      <div class="search-box">
+        <div class="input-group">
+          <input type="text" id="search-input" placeholder="輸入書名、作者或出版社搜尋..." autocomplete="off">
+          <button class="clear-btn" id="clear-btn">&times;</button>
+        </div>
+
+        <div class="actions-grid">
+          <button class="btn btn-primary" id="scan-btn">
+            📷 拍照辨識
+          </button>
+          <label class="btn btn-secondary" style="margin: 0; text-align: center;">
+            📁 上傳照片
+            <input type="file" id="file-input" accept="image/*" style="display: none;">
+          </label>
+        </div>
+
+        <!-- 拍照相機區塊 -->
+        <div class="camera-section" id="camera-section">
+          <div class="camera-preview-container">
+            <video id="video-preview" autoplay playsinline></video>
+            <canvas id="capture-canvas"></canvas>
+            <div class="scan-overlay">
+              <div class="scan-box">
+                <div class="scan-line"></div>
+              </div>
+            </div>
+          </div>
+          <div class="actions-grid">
+            <button class="btn btn-primary" id="capture-btn">📸 拍攝</button>
+            <button class="btn btn-secondary" id="cancel-camera-btn">關閉</button>
+          </div>
+        </div>
+
+        <div class="filter-controls">
+          <div class="select-wrapper">
+            <select id="filter-age">
+              <option value="">全部適讀年段</option>
+              <option value="低年級">國小低年級</option>
+              <option value="中年級">國小中年級</option>
+              <option value="高年級">國小高年級</option>
+              <option value="國中">國中</option>
+              <option value="高中">高中</option>
+            </select>
+          </div>
+
+          <div class="select-wrapper">
+            <select id="filter-certified">
+              <option value="">全部狀態</option>
+              <option value="true">可認證</option>
+              <option value="false">不可認證</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="info-row">
+          <span id="results-count">共有 <strong>0</strong> 本書籍</span>
+          <div class="select-wrapper">
+            <select id="display-mode">
+              <option value="20">每頁 20 本</option>
+              <option value="50">每頁 50 本</option>
+              <option value="all">顯示全部</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- 搜尋結果區 -->
+    <div class="book-list" id="book-list">
+      <!-- 搜尋結果將由 JavaScript 動態渲染 -->
+    </div>
+
+    <!-- 分頁導覽 -->
+    <div class="pagination hidden" id="pagination-container">
+      <button class="btn btn-secondary" id="prev-page-btn">上一頁</button>
+      <span class="pagination-info" id="pagination-info">第 1 / 1 頁</span>
+      <button class="btn btn-secondary" id="next-page-btn">下一頁</button>
+    </div>
+  </div>
+
+  <!-- Toast 訊息提示 -->
+  <div class="toast" id="toast">
+    <span class="toast-text" id="toast-text"></span>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

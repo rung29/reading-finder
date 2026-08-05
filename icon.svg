@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4f46e5;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#06b6d4;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="240" fill="url(#grad1)" />
+  <!-- Book shape -->
+  <path d="M160 128h192v256H160z" fill="none"/>
+  <!-- Open Book Details -->
+  <path d="M384 128h-96a64.07 64.07 0 0 0-64 64 64.07 64.07 0 0 0-64-64h-96v256h96a64.07 64.07 0 0 1 64 64 64.07 64.07 0 0 1 64-64h96V128z" fill="#ffffff"/>
+  <!-- Pages line detail -->
+  <path d="M192 192h-32v16h32zm0 48h-32v16h32zm0 48h-32v16h32zm160-92h-32v16h32zm0 48h-32v16h32zm0 48h-32v16h32z" fill="#cbd5e1"/>
+  <!-- Search glass icon overlay -->
+  <circle cx="256" cy="300" r="48" fill="#f8fafc" stroke="#1e293b" stroke-width="8"/>
+  <line x1="290" y1="334" x2="330" y2="374" stroke="#1e293b" stroke-width="10" stroke-linecap="round"/>
+</svg>

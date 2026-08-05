@@ -1,0 +1,382 @@
+// 全局狀態變數
+let booksData = [];
+let filteredBooks = [];
+let fuseInstance = null;
+let currentPage = 1;
+let pageSize = 20; // 預設每頁顯示 20 筆
+let videoStream = null;
+
+// DOM 元素引用
+const searchInput = document.getElementById('search-input');
+const clearBtn = document.getElementById('clear-btn');
+const filterAge = document.getElementById('filter-age');
+const filterCertified = document.getElementById('filter-certified');
+const displayMode = document.getElementById('display-mode');
+const resultsCount = document.getElementById('results-count');
+const bookListContainer = document.getElementById('book-list');
+const themeToggle = document.getElementById('theme-toggle');
+const offlineBanner = document.getElementById('offline-banner');
+
+// OCR 與相機相關元素
+const scanBtn = document.getElementById('scan-btn');
+const fileInput = document.getElementById('file-input');
+const cameraSection = document.getElementById('camera-section');
+const videoPreview = document.getElementById('video-preview');
+const captureCanvas = document.getElementById('capture-canvas');
+const captureBtn = document.getElementById('capture-btn');
+const cancelCameraBtn = document.getElementById('cancel-camera-btn');
+
+// 分頁元素
+const paginationContainer = document.getElementById('pagination-container');
+const prevPageBtn = document.getElementById('prev-page-btn');
+const nextPageBtn = document.getElementById('next-page-btn');
+const paginationInfo = document.getElementById('pagination-info');
+
+// 提示框 (Toast) 元素
+const toastElement = document.getElementById('toast');
+const toastText = document.getElementById('toast-text');
+
+// 1. 初始化載入書籍資料
+async function init() {
+  showToast('正在載入書籍資料庫...');
+  try {
+    const response = await fetch('books.json');
+    if (!response.ok) throw new Error('無法讀取 books.json');
+    booksData = await response.json();
+    
+    // 初始化 Fuse.js 模糊搜尋引擎
+    const options = {
+      keys: [
+        { name: 'title', weight: 0.6 },
+        { name: 'author', weight: 0.2 },
+        { name: 'publisher', weight: 0.2 }
+      ],
+      threshold: 0.4, // 模糊度匹配閥值 (0.0 精確比對，1.0 匹配所有)
+      ignoreLocation: true
+    };
+    fuseInstance = new Fuse(booksData, options);
+    
+    // 預設載入全部書籍並渲染
+    applyFiltersAndSearch();
+    showToast(`成功載入 ${booksData.length} 本書籍！`, 'success');
+  } catch (error) {
+    console.error('初始化失敗:', error);
+    showToast('書籍資料載入失敗，請確認網路連線。', 'error');
+  }
+}
+
+// 2. 顯示 Toast 訊息
+function showToast(message, type = 'info') {
+  toastText.textContent = message;
+  toastElement.className = `toast show ${type}`;
+  setTimeout(() => {
+    toastElement.classList.remove('show');
+  }, 3500);
+}
+
+// 3. 處理搜尋與篩選邏輯
+function applyFiltersAndSearch() {
+  const query = searchInput.value.trim();
+  const ageFilter = filterAge.value;
+  const certifiedFilter = filterCertified.value;
+  
+  // 顯示清除按鈕
+  clearBtn.style.display = query ? 'block' : 'none';
+
+  // 第一階段：模糊搜尋或返回全部
+  let results = [];
+  if (query && fuseInstance) {
+    const fuseResults = fuseInstance.search(query);
+    results = fuseResults.map(r => r.item);
+  } else {
+    results = [...booksData];
+  }
+
+  // 第二階段：適讀年段篩選
+  if (ageFilter) {
+    results = results.filter(book => book.age_group.includes(ageFilter));
+  }
+
+  // 第三階段：認證狀態篩選
+  if (certifiedFilter !== "") {
+    const isCertified = certifiedFilter === "true";
+    results = results.filter(book => book.certified === isCertified);
+  }
+
+  filteredBooks = results;
+  currentPage = 1; // 搜尋重設為第一頁
+  renderResults();
+}
+
+// 4. 渲染書籍卡片清單與分頁
+function renderResults() {
+  bookListContainer.innerHTML = '';
+  
+  // 顯示當前搜尋筆數
+  resultsCount.innerHTML = `共有 <strong>${filteredBooks.length}</strong> 本書籍`;
+
+  if (filteredBooks.length === 0) {
+    bookListContainer.innerHTML = `<div class="glass-card" style="text-align:center; padding:30px; color:var(--text-secondary);">查無符合搜尋條件的書籍 🔍</div>`;
+    paginationContainer.classList.add('hidden');
+    return;
+  }
+
+  // 取得分頁顯示設定
+  const mode = displayMode.value;
+  let renderData = [];
+  
+  if (mode === 'all') {
+    renderData = filteredBooks;
+    paginationContainer.classList.add('hidden');
+  } else {
+    pageSize = parseInt(mode, 10);
+    const totalPages = Math.ceil(filteredBooks.length / pageSize);
+    
+    // 邊界條件處理
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+    
+    const startIdx = (currentPage - 1) * pageSize;
+    renderData = filteredBooks.slice(startIdx, startIdx + pageSize);
+    
+    // 更新分頁控制項
+    paginationContainer.classList.remove('hidden');
+    paginationInfo.textContent = `第 ${currentPage} / ${totalPages} 頁`;
+    prevPageBtn.disabled = currentPage === 1;
+    nextPageBtn.disabled = currentPage === totalPages;
+  }
+
+  // 生成書籍卡片並加入容器
+  renderData.forEach(book => {
+    const card = document.createElement('div');
+    card.className = 'book-card';
+    
+    const titleHtml = book.link 
+      ? `<a href="${book.link}" target="_blank" class="book-title">${book.title}</a>`
+      : `<span class="book-title">${book.title}</span>`;
+      
+    const badgeClass = book.certified ? 'badge-success' : 'badge-danger';
+    const badgeText = book.certified ? '可認證' : '不可認證';
+
+    card.innerHTML = `
+      <div class="book-header">
+        ${titleHtml}
+        <span class="badge ${badgeClass}">${badgeText}</span>
+      </div>
+      <div class="book-details">
+        <div class="detail-item"><strong>作者：</strong>${book.author || '未知'}</div>
+        <div class="detail-item"><strong>適讀：</strong>${book.age_group}</div>
+        <div class="detail-item" style="grid-column: span 2;"><strong>出版社：</strong>${book.publisher || '無'}</div>
+      </div>
+    `;
+    bookListContainer.appendChild(card);
+  });
+}
+
+// 5. 拍照辨識與檔案上傳 (OCR 功能)
+async function startCamera() {
+  cameraSection.style.display = 'flex';
+  scanBtn.disabled = true;
+  
+  try {
+    const constraints = {
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false
+    };
+    videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+    videoPreview.srcObject = videoStream;
+  } catch (err) {
+    console.error('無法啟動相機:', err);
+    showToast('無法啟動相機，請嘗試上傳照片或檢查權限。', 'error');
+    stopCamera();
+  }
+}
+
+function stopCamera() {
+  if (videoStream) {
+    videoStream.getTracks().forEach(track => track.stop());
+    videoStream = null;
+  }
+  videoPreview.srcObject = null;
+  cameraSection.style.display = 'none';
+  scanBtn.disabled = false;
+}
+
+// 拍照擷取與 OCR
+captureBtn.addEventListener('click', () => {
+  if (!videoStream) return;
+
+  const width = videoPreview.videoWidth;
+  const height = videoPreview.videoHeight;
+  captureCanvas.width = width;
+  captureCanvas.height = height;
+
+  const ctx = captureCanvas.getContext('2d');
+  ctx.drawImage(videoPreview, 0, 0, width, height);
+
+  // 為了提高辨識率，僅裁剪中間綠色框範圍進行 OCR
+  // 綠色框大約在高度的 30% 到 70% 之間，寬度的 10% 到 90% 之間
+  const cropX = width * 0.1;
+  const cropY = height * 0.3;
+  const cropW = width * 0.8;
+  const cropH = height * 0.4;
+
+  const cropCanvas = document.createElement('canvas');
+  cropCanvas.width = cropW;
+  cropCanvas.height = cropH;
+  const cropCtx = cropCanvas.getContext('2d');
+  cropCtx.drawImage(captureCanvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+
+  stopCamera();
+  processImageForOCR(cropCanvas);
+});
+
+// 上傳圖片與 OCR
+fileInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    const img = new Image();
+    img.onload = () => {
+      processImageForOCR(img);
+    };
+    img.src = event.target.result;
+  };
+  reader.readAsDataURL(file);
+});
+
+// 使用 Tesseract.js 做中文繁體 OCR 解析
+async function processImageForOCR(imageSource) {
+  showToast('正在辨識書名中，首次載入繁中模型需時約 15 秒，請稍候...', 'info');
+  
+  try {
+    // 建立辨識器，使用傳統中文 (chi_tra)
+    const worker = await Tesseract.createWorker({
+      logger: m => {
+        if (m.status === 'recognizing text') {
+          showToast(`正在辨識書名: ${Math.round(m.progress * 100)}%`);
+        }
+      }
+    });
+    
+    await worker.loadLanguage('chi_tra');
+    await worker.initialize('chi_tra');
+    
+    // 限制辨識字元以利於中文排版
+    const { data: { text } } = await worker.recognize(imageSource);
+    await worker.terminate();
+
+    // 清理 OCR 辨識結果中的雜訊與換行
+    const cleanedText = text
+      .replace(/[^\u4e00-\u9fff0-9a-zA-Z]/g, ' ') // 僅保留中英文與數字
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (cleanedText) {
+      // 擷取前幾個中文字作為書名查詢詞（一般書名在 2~10 字之間）
+      const searchKeyword = cleanedText.slice(0, 12);
+      searchInput.value = searchKeyword;
+      showToast(`辨識成功: "${searchKeyword}"`, 'success');
+      applyFiltersAndSearch();
+    } else {
+      showToast('未能清楚辨識任何文字，請重新拍照或調整對焦。', 'error');
+    }
+  } catch (error) {
+    console.error('OCR 辨識錯誤:', error);
+    showToast('辨識引擎載入出錯，請確認網路連線。', 'error');
+  }
+}
+
+// 6. 事件綁定
+searchInput.addEventListener('input', applyFiltersAndSearch);
+clearBtn.addEventListener('click', () => {
+  searchInput.value = '';
+  applyFiltersAndSearch();
+  searchInput.focus();
+});
+
+filterAge.addEventListener('change', applyFiltersAndSearch);
+filterCertified.addEventListener('change', applyFiltersAndSearch);
+displayMode.addEventListener('change', () => {
+  currentPage = 1;
+  renderResults();
+});
+
+// 分頁點擊事件
+prevPageBtn.addEventListener('click', () => {
+  if (currentPage > 1) {
+    currentPage--;
+    renderResults();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+});
+
+nextPageBtn.addEventListener('click', () => {
+  const totalPages = Math.ceil(filteredBooks.length / pageSize);
+  if (currentPage < totalPages) {
+    currentPage++;
+    renderResults();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+});
+
+// 相機開啟與關閉按鈕
+scanBtn.addEventListener('click', startCamera);
+cancelCameraBtn.addEventListener('click', stopCamera);
+
+// 7. 深色主題切換
+function initTheme() {
+  const savedTheme = localStorage.getItem('theme');
+  const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  
+  if (savedTheme === 'light') {
+    document.documentElement.removeAttribute('data-theme');
+    themeToggle.textContent = '☀️';
+  } else if (savedTheme === 'dark' || systemPrefersDark) {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    themeToggle.textContent = '🌙';
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+    themeToggle.textContent = '☀️';
+  }
+}
+
+themeToggle.addEventListener('click', () => {
+  const isDark = document.documentElement.hasAttribute('data-theme');
+  if (isDark) {
+    document.documentElement.removeAttribute('data-theme');
+    localStorage.setItem('theme', 'light');
+    themeToggle.textContent = '☀️';
+  } else {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    localStorage.setItem('theme', 'dark');
+    themeToggle.textContent = '🌙';
+  }
+});
+
+// 8. 偵測離線狀態
+window.addEventListener('online', () => {
+  offlineBanner.style.display = 'none';
+});
+window.addEventListener('offline', () => {
+  offlineBanner.style.display = 'block';
+});
+
+if (!navigator.onLine) {
+  offlineBanner.style.display = 'block';
+}
+
+// 9. 註冊 PWA Service Worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => console.log('Service Worker 註冊成功', reg.scope))
+      .catch(err => console.warn('Service Worker 註冊失敗', err));
+  });
+}
+
+// 執行載入與初始化
+initTheme();
+init();
