@@ -371,45 +371,60 @@ def main():
         
     print("\n✅ 搜尋初始化成功！已成功套用您的篩選條件。")
     
-    # 迴圈讓使用者抓取多個頁碼
+    # 迴圈讓使用者抓取多個頁碼或範圍
     while True:
-        page_input = input("\n請輸入要下載的頁碼 (例如：1，或輸入 q 退出)：").strip()
+        page_input = input("\n請輸入要下載的頁碼或範圍 (例如：1 或 1-5，輸入 q 退出)：").strip()
         if page_input.lower() == 'q':
             print("感謝使用！程式已結束。")
             break
             
+        pages_to_fetch = []
         try:
-            page_number = int(page_input)
-            if page_number <= 0:
-                raise ValueError
+            if '-' in page_input:
+                start, end = map(int, page_input.split('-'))
+                if start <= 0 or end < start:
+                    raise ValueError
+                pages_to_fetch = list(range(start, end + 1))
+            else:
+                page_number = int(page_input)
+                if page_number <= 0:
+                    raise ValueError
+                pages_to_fetch = [page_number]
         except ValueError:
-            print("請輸入有效的正整數頁碼！")
+            print("請輸入有效的頁碼格式 (正整數，例如 1 或 1-5)！")
             continue
             
-        print(f"正在抓取第 {page_number} 頁...")
-        try:
-            books = fetch_books_by_page(session, page_number)
-        except SourceStructureError as exc:
-            print(f"來源格式異常：{exc}", file=sys.stderr)
-            continue
-        if books:
-            # 若為複選年段，在本地端進行聯集過濾
-            if selected_range_names:
-                books = [b for b in books if b.get("range", "").strip() in selected_range_names]
-
+        import time
+        for page_number in pages_to_fetch:
+            print(f"正在抓取第 {page_number} 頁...")
+            try:
+                books = fetch_books_by_page(session, page_number)
+            except SourceStructureError as exc:
+                print(f"來源格式異常：{exc}", file=sys.stderr)
+                continue
             if books:
-                save_to_html(books, page_number, readrang_display_name, testing_name, keywords)
+                # 若為複選年段，在本地端進行聯集過濾
+                if selected_range_names:
+                    books = [b for b in books if b.get("range", "").strip() in selected_range_names]
+    
+                if books:
+                    save_to_html(books, page_number, readrang_display_name, testing_name, keywords)
+                else:
+                    print(f"\n第 {page_number} 頁抓取到的書籍中，沒有符合選擇年段 ({readrang_display_name}) 的項目。")
+                # 在抓取成功後，刪除暫存的驗證碼圖片檔案
+                captcha_path = os.path.join(os.getcwd(), "captcha.png")
+                if os.path.exists(captcha_path):
+                    try:
+                        os.remove(captcha_path)
+                    except Exception:
+                        pass
             else:
-                print(f"\n第 {page_number} 頁抓取到的書籍中，沒有符合選擇年段 ({readrang_display_name}) 的項目。")
-            # 在抓取成功後，刪除暫存的驗證碼圖片檔案
-            captcha_path = os.path.join(os.getcwd(), "captcha.png")
-            if os.path.exists(captcha_path):
-                try:
-                    os.remove(captcha_path)
-                except Exception:
-                    pass
-        else:
-            print(f"抓取第 {page_number} 頁失敗。可能該頁面超出範圍，或者連線已逾期。")
+                print(f"抓取第 {page_number} 頁失敗。可能該頁面超出範圍，或者連線已逾期。")
+                break # 失敗可能是超出最大頁數，因此中斷該範圍的後續下載
+            
+            # 若為範圍下載，加入短暫延遲避免請求過於密集
+            if len(pages_to_fetch) > 1 and page_number != pages_to_fetch[-1]:
+                time.sleep(1)
 
 if __name__ == "__main__":
     main()
