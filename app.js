@@ -260,7 +260,7 @@ captureBtn.addEventListener('click', () => {
   cropCtx.drawImage(captureCanvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
 
   stopCamera();
-  processImageWithOCRSpace(cropCanvas);
+  processImageWithGemini(cropCanvas);
 });
 
 // 上傳圖片後呼叫 Vision API
@@ -284,61 +284,64 @@ fileInput.addEventListener('change', (e) => {
       canvas.height = img.height;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0);
-      processImageWithOCRSpace(canvas);
+      processImageWithGemini(canvas);
     };
     img.src = event.target.result;
   };
   reader.readAsDataURL(file);
 });
 
-// 使用 OCR.Space API 進行繁體中文 OCR 辨識
-async function processImageWithOCRSpace(canvasSource) {
+// 使用 Gemini API 進行繁體中文 OCR 辨識
+async function processImageWithGemini(canvasSource) {
   const apiKey = getApiKey();
   if (!apiKey) {
-    showToast('請先設定 OCR.Space API 金鑰。', 'error');
+    showToast('請先設定 Gemini API 金鑰。', 'error');
     return;
   }
 
-  showToast('正在使用 OCR.Space 辨識書名...', 'info');
+  showToast('正在使用 Gemini API 辨識書名...', 'info');
 
   try {
-    // 將 Canvas 轉為 base64 編碼的 JPEG 格式（包含 data URI 前綴）
-    const base64Image = canvasSource.toDataURL('image/jpeg', 0.85);
+    // 將 Canvas 轉為 base64 編碼的 JPEG 格式，Gemini API 需要純 Base64 字串（無前綴）
+    const base64Image = canvasSource.toDataURL('image/jpeg', 0.85).split(',')[1];
 
-    // 建立 FormData 用於 OCR.Space
-    const formData = new FormData();
-    formData.append('apikey', apiKey);
-    formData.append('language', 'cht'); // 繁體中文
-    formData.append('base64Image', base64Image);
+    const requestBody = {
+      contents: [{
+        parts: [
+          { text: "請辨識圖片中的書名。只需要回覆書名本身，如果辨識不到請回覆空字串。輸出必須是繁體中文。" },
+          {
+            inline_data: {
+              mime_type: "image/jpeg",
+              data: base64Image
+            }
+          }
+        ]
+      }]
+    };
 
-    const response = await fetch('https://api.ocr.space/parse/image', {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
-      body: formData
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody)
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-
-    const data = await response.json();
-    
-    // OCR.Space 錯誤處理
-    if (data.IsErroredOnProcessing) {
-      const errMsg = data.ErrorMessage ? data.ErrorMessage.join(', ') : '辨識處理失敗';
+      const errData = await response.json().catch(() => ({}));
+      const errMsg = errData?.error?.message || `HTTP ${response.status}`;
       throw new Error(errMsg);
     }
 
-    const parsedResults = data.ParsedResults;
-    const fullText = parsedResults && parsedResults.length > 0 ? parsedResults[0].ParsedText : '';
+    const data = await response.json();
+    const fullText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
-    // 清理 OCR 辨識結果中的雜訊與換行
+    // 清理辨識結果中的雜訊與換行
     const cleanedText = fullText
       .replace(/[^\u4e00-\u9fff0-9a-zA-Z\u3000-\u303f\uff00-\uffef]/g, ' ') // 保留中英文、數字與全形標點
       .replace(/\s+/g, ' ')
       .trim();
 
     if (cleanedText) {
-      // 擷取前幾個文字作為書名查詢詞（一般書名在 2~15 字之間）
+      // 擷取前幾個文字作為書名查詢詞
       const searchKeyword = cleanedText.slice(0, 15).trim();
       searchInput.value = searchKeyword;
       showToast(`辨識成功: "${searchKeyword}"`, 'success');
@@ -347,8 +350,8 @@ async function processImageWithOCRSpace(canvasSource) {
       showToast('未能辨識出文字，請重新拍照或調整對焦。', 'error');
     }
   } catch (error) {
-    console.error('OCR.Space 辨識錯誤:', error);
-    if (error.message.includes('API key') || error.message.includes('Not valid')) {
+    console.error('Gemini API 辨識錯誤:', error);
+    if (error.message.includes('API key') || error.message.includes('API_KEY_INVALID')) {
       showToast('API 金鑰無效，請至設定中確認。', 'error');
     } else {
       showToast(`辨識失敗: ${error.message}`, 'error');
