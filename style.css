@@ -2,7 +2,7 @@
 
 :root {
   --font-sans: 'Outfit', 'Noto Sans TC', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  
+
   /* Light Mode Palette */
   --bg-primary: #f3f4f6;
   --bg-card: rgba(255, 255, 255, 0.8);
@@ -13,7 +13,7 @@
   --success: #10b981;
   --danger: #ef4444;
   --border: rgba(229, 231, 235, 0.5);
-  
+
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
@@ -143,15 +143,18 @@ header {
 
 .input-group .clear-btn {
   position: absolute;
-  right: 14px;
+  right: 6px;
   top: 50%;
   transform: translateY(-50%);
   background: none;
   border: none;
   color: var(--text-secondary);
   cursor: pointer;
-  font-size: 1.2rem;
+  font-size: 1.6rem;
+  padding: 10px; /* 增加觸控範圍 */
+  border-radius: 50%;
   display: none;
+  line-height: 1;
 }
 
 /* Action Buttons Grid */
@@ -258,9 +261,17 @@ header {
 }
 
 @keyframes scan {
-  0% { top: 0%; }
-  50% { top: 100%; }
-  100% { top: 0%; }
+  0% {
+    top: 0%;
+  }
+
+  50% {
+    top: 100%;
+  }
+
+  100% {
+    top: 0%;
+  }
 }
 
 /* Info Summary Row */
@@ -402,7 +413,9 @@ header {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .toast {
@@ -483,6 +496,7 @@ header {
     opacity: 0;
     transform: scale(0.9) translateY(20px);
   }
+
   to {
     opacity: 1;
     transform: scale(1) translateY(0);
