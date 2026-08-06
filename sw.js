@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reading-finder-v1';
+const CACHE_NAME = 'reading-finder-v2';
 const ASSETS = [
   './',
   './index.html',

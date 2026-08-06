@@ -36,6 +36,16 @@ const paginationInfo = document.getElementById('pagination-info');
 const toastElement = document.getElementById('toast');
 const toastText = document.getElementById('toast-text');
 
+// 設定彈窗元素
+const openSettingsBtn = document.getElementById('open-settings-btn');
+const settingsModal = document.getElementById('settings-modal');
+const apiKeyInput = document.getElementById('api-key-input');
+const saveSettingsBtn = document.getElementById('save-settings-btn');
+const closeSettingsBtn = document.getElementById('close-settings-btn');
+
+// API Key 在 localStorage 中的儲存鍵名
+const API_KEY_STORAGE_KEY = 'vision_api_key';
+
 // 1. 初始化載入書籍資料
 async function init() {
   showToast('正在載入書籍資料庫...');
@@ -173,8 +183,31 @@ function renderResults() {
   });
 }
 
-// 5. 拍照辨識與檔案上傳 (OCR 功能)
+// ============================================================
+// 5. Google Cloud Vision API OCR 辨識功能
+// ============================================================
+
+// 從 localStorage 取得已儲存的 API Key
+function getApiKey() {
+  return localStorage.getItem(API_KEY_STORAGE_KEY) || '';
+}
+
+// 檢查 API Key 是否已設定，若無則提示使用者
+function ensureApiKey() {
+  const key = getApiKey();
+  if (!key) {
+    showToast('請先點擊右上角 ⚙️ 設定 Google Cloud API 金鑰。', 'error');
+    settingsModal.classList.remove('hidden');
+    return false;
+  }
+  return true;
+}
+
+// 拍照辨識相機啟動
 async function startCamera() {
+  // 先確認有設定 API Key
+  if (!ensureApiKey()) return;
+
   cameraSection.style.display = 'flex';
   scanBtn.disabled = true;
   
@@ -202,7 +235,7 @@ function stopCamera() {
   scanBtn.disabled = false;
 }
 
-// 拍照擷取與 OCR
+// 拍照擷取後呼叫 Vision API
 captureBtn.addEventListener('click', () => {
   if (!videoStream) return;
 
@@ -215,7 +248,6 @@ captureBtn.addEventListener('click', () => {
   ctx.drawImage(videoPreview, 0, 0, width, height);
 
   // 為了提高辨識率，僅裁剪中間綠色框範圍進行 OCR
-  // 綠色框大約在高度的 30% 到 70% 之間，寬度的 10% 到 90% 之間
   const cropX = width * 0.1;
   const cropY = height * 0.3;
   const cropW = width * 0.8;
@@ -228,68 +260,146 @@ captureBtn.addEventListener('click', () => {
   cropCtx.drawImage(captureCanvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
 
   stopCamera();
-  processImageForOCR(cropCanvas);
+  processImageWithVisionAPI(cropCanvas);
 });
 
-// 上傳圖片與 OCR
+// 上傳圖片後呼叫 Vision API
 fileInput.addEventListener('change', (e) => {
   const file = e.target.files[0];
   if (!file) return;
+
+  // 先確認有設定 API Key
+  if (!ensureApiKey()) {
+    fileInput.value = ''; // 清空選取
+    return;
+  }
 
   const reader = new FileReader();
   reader.onload = (event) => {
     const img = new Image();
     img.onload = () => {
-      processImageForOCR(img);
+      // 將圖片繪製到 Canvas，方便後續轉為 base64
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      processImageWithVisionAPI(canvas);
     };
     img.src = event.target.result;
   };
   reader.readAsDataURL(file);
 });
 
-// 使用 Tesseract.js 做中文繁體 OCR 解析
-async function processImageForOCR(imageSource) {
-  showToast('正在辨識書名中，首次載入繁中模型需時約 15 秒，請稍候...', 'info');
-  
+// 使用 Google Cloud Vision API 進行繁體中文 OCR 辨識
+async function processImageWithVisionAPI(canvasSource) {
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    showToast('請先設定 Google Cloud API 金鑰。', 'error');
+    return;
+  }
+
+  showToast('正在使用 Google Vision API 辨識書名...', 'info');
+
   try {
-    // 建立辨識器，使用傳統中文 (chi_tra)
-    const worker = await Tesseract.createWorker({
-      logger: m => {
-        if (m.status === 'recognizing text') {
-          showToast(`正在辨識書名: ${Math.round(m.progress * 100)}%`);
+    // 將 Canvas 轉為 base64 編碼的 JPEG 格式（去除 data:image/jpeg;base64, 前綴）
+    const base64Image = canvasSource.toDataURL('image/jpeg', 0.85).split(',')[1];
+
+    // 組成 Vision API 的請求 Payload
+    const requestBody = {
+      requests: [
+        {
+          image: { content: base64Image },
+          features: [{ type: 'TEXT_DETECTION', maxResults: 1 }],
+          imageContext: {
+            languageHints: ['zh-Hant', 'en'] // 提示繁體中文與英文
+          }
         }
+      ]
+    };
+
+    const response = await fetch(
+      `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
       }
-    });
-    
-    await worker.loadLanguage('chi_tra');
-    await worker.initialize('chi_tra');
-    
-    // 限制辨識字元以利於中文排版
-    const { data: { text } } = await worker.recognize(imageSource);
-    await worker.terminate();
+    );
+
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      const errMsg = errData?.error?.message || `HTTP ${response.status}`;
+      throw new Error(errMsg);
+    }
+
+    const data = await response.json();
+    const fullText = data.responses?.[0]?.fullTextAnnotation?.text || '';
 
     // 清理 OCR 辨識結果中的雜訊與換行
-    const cleanedText = text
-      .replace(/[^\u4e00-\u9fff0-9a-zA-Z]/g, ' ') // 僅保留中英文與數字
+    const cleanedText = fullText
+      .replace(/[^\u4e00-\u9fff0-9a-zA-Z\u3000-\u303f\uff00-\uffef]/g, ' ') // 保留中英文、數字與全形標點
       .replace(/\s+/g, ' ')
       .trim();
 
     if (cleanedText) {
-      // 擷取前幾個中文字作為書名查詢詞（一般書名在 2~10 字之間）
-      const searchKeyword = cleanedText.slice(0, 12);
+      // 擷取前幾個文字作為書名查詢詞（一般書名在 2~15 字之間）
+      const searchKeyword = cleanedText.slice(0, 15).trim();
       searchInput.value = searchKeyword;
       showToast(`辨識成功: "${searchKeyword}"`, 'success');
       applyFiltersAndSearch();
     } else {
-      showToast('未能清楚辨識任何文字，請重新拍照或調整對焦。', 'error');
+      showToast('未能辨識出文字，請重新拍照或調整對焦。', 'error');
     }
   } catch (error) {
-    console.error('OCR 辨識錯誤:', error);
-    showToast('辨識引擎載入出錯，請確認網路連線。', 'error');
+    console.error('Vision API 辨識錯誤:', error);
+    if (error.message.includes('API key')) {
+      showToast('API 金鑰無效或已過期，請至設定中更新。', 'error');
+    } else {
+      showToast(`辨識失敗: ${error.message}`, 'error');
+    }
   }
 }
 
-// 6. 事件綁定
+// ============================================================
+// 6. 設定面板 (API Key 管理)
+// ============================================================
+
+// 開啟設定彈窗
+openSettingsBtn.addEventListener('click', () => {
+  apiKeyInput.value = getApiKey();
+  settingsModal.classList.remove('hidden');
+});
+
+// 儲存 API Key
+saveSettingsBtn.addEventListener('click', () => {
+  const key = apiKeyInput.value.trim();
+  if (key) {
+    localStorage.setItem(API_KEY_STORAGE_KEY, key);
+    showToast('API 金鑰已成功儲存！', 'success');
+  } else {
+    localStorage.removeItem(API_KEY_STORAGE_KEY);
+    showToast('已清除 API 金鑰。', 'info');
+  }
+  settingsModal.classList.add('hidden');
+});
+
+// 關閉設定彈窗
+closeSettingsBtn.addEventListener('click', () => {
+  settingsModal.classList.add('hidden');
+});
+
+// 點擊遮罩層關閉彈窗
+settingsModal.addEventListener('click', (e) => {
+  if (e.target === settingsModal) {
+    settingsModal.classList.add('hidden');
+  }
+});
+
+// ============================================================
+// 7. 事件綁定
+// ============================================================
+
 searchInput.addEventListener('input', applyFiltersAndSearch);
 clearBtn.addEventListener('click', () => {
   searchInput.value = '';
@@ -326,7 +436,7 @@ nextPageBtn.addEventListener('click', () => {
 scanBtn.addEventListener('click', startCamera);
 cancelCameraBtn.addEventListener('click', stopCamera);
 
-// 7. 深色主題切換
+// 8. 深色主題切換
 function initTheme() {
   const savedTheme = localStorage.getItem('theme');
   const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -356,7 +466,7 @@ themeToggle.addEventListener('click', () => {
   }
 });
 
-// 8. 偵測離線狀態
+// 9. 偵測離線狀態
 window.addEventListener('online', () => {
   offlineBanner.style.display = 'none';
 });
@@ -368,7 +478,7 @@ if (!navigator.onLine) {
   offlineBanner.style.display = 'block';
 }
 
-// 9. 註冊 PWA Service Worker
+// 10. 註冊 PWA Service Worker
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js')

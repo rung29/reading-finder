@@ -9,8 +9,6 @@
   <link rel="shortcut icon" href="icon.svg" type="image/svg+xml">
   <!-- 引入模糊搜尋 Fuse.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/6.6.2/fuse.min.js"></script>
-  <!-- 引入中文 OCR Tesseract.js -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js"></script>
 </head>
 <body>
   <div class="app-container">
@@ -19,7 +17,10 @@
         <img src="icon.svg" alt="Logo">
         <h1>彰化認證查詢</h1>
       </div>
-      <button class="theme-toggle" id="theme-toggle" aria-label="切換主題">🌙</button>
+      <div style="display: flex; gap: 8px;">
+        <button class="theme-toggle" id="open-settings-btn" aria-label="設定 Vision API">⚙️</button>
+        <button class="theme-toggle" id="theme-toggle" aria-label="切換主題">🌙</button>
+      </div>
     </header>
 
     <div class="offline-banner" id="offline-banner">目前處於離線狀態，已自動切換為離線搜尋模式</div>
@@ -102,6 +103,24 @@
       <button class="btn btn-secondary" id="prev-page-btn">上一頁</button>
       <span class="pagination-info" id="pagination-info">第 1 / 1 頁</span>
       <button class="btn btn-secondary" id="next-page-btn">下一頁</button>
+    </div>
+  </div>
+
+  <!-- 設定金鑰彈窗 -->
+  <div class="modal-backdrop hidden" id="settings-modal">
+    <div class="glass-card modal-content">
+      <h2>⚙️ Vision API 設定</h2>
+      <p style="margin: 10px 0; font-size: 0.9rem; color: var(--text-secondary);">請輸入您的 Google Cloud API 金鑰：</p>
+      <div class="input-group" style="margin: 15px 0;">
+        <input type="password" id="api-key-input" placeholder="AIzaSy..." style="width: 100%; padding: 12px; border-radius: 8px; border: 1.5px solid var(--border); background: rgba(255,255,255,0.05); color: var(--text-primary);">
+      </div>
+      <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.4;">
+        * 金鑰僅會安全地儲存在本機瀏覽器 (localStorage)，不會上傳到任何其他伺服器。
+      </p>
+      <div class="actions-grid">
+        <button class="btn btn-primary" id="save-settings-btn">儲存</button>
+        <button class="btn btn-secondary" id="close-settings-btn">關閉</button>
+      </div>
     </div>
   </div>
 
