@@ -53,7 +53,7 @@ async function init() {
     const response = await fetch('books.json');
     if (!response.ok) throw new Error('無法讀取 books.json');
     booksData = await response.json();
-    
+
     // 初始化 Fuse.js 模糊搜尋引擎
     const options = {
       keys: [
@@ -65,7 +65,7 @@ async function init() {
       ignoreLocation: true
     };
     fuseInstance = new Fuse(booksData, options);
-    
+
     // 預設載入全部書籍並渲染
     applyFiltersAndSearch();
     showToast(`成功載入 ${booksData.length} 本書籍！`, 'success');
@@ -89,7 +89,7 @@ function applyFiltersAndSearch() {
   const query = searchInput.value.trim();
   const ageFilter = filterAge.value;
   const certifiedFilter = filterCertified.value;
-  
+
   // 顯示清除按鈕
   clearBtn.style.display = query ? 'block' : 'none';
 
@@ -121,7 +121,7 @@ function applyFiltersAndSearch() {
 // 4. 渲染書籍卡片清單與分頁
 function renderResults() {
   bookListContainer.innerHTML = '';
-  
+
   // 顯示當前搜尋筆數
   resultsCount.innerHTML = `共有 <strong>${filteredBooks.length}</strong> 本書籍`;
 
@@ -134,21 +134,21 @@ function renderResults() {
   // 取得分頁顯示設定
   const mode = displayMode.value;
   let renderData = [];
-  
+
   if (mode === 'all') {
     renderData = filteredBooks;
     paginationContainer.classList.add('hidden');
   } else {
     pageSize = parseInt(mode, 10);
     const totalPages = Math.ceil(filteredBooks.length / pageSize);
-    
+
     // 邊界條件處理
     if (currentPage > totalPages) currentPage = totalPages;
     if (currentPage < 1) currentPage = 1;
-    
+
     const startIdx = (currentPage - 1) * pageSize;
     renderData = filteredBooks.slice(startIdx, startIdx + pageSize);
-    
+
     // 更新分頁控制項
     paginationContainer.classList.remove('hidden');
     paginationInfo.textContent = `第 ${currentPage} / ${totalPages} 頁`;
@@ -160,11 +160,11 @@ function renderResults() {
   renderData.forEach(book => {
     const card = document.createElement('div');
     card.className = 'book-card';
-    
-    const titleHtml = book.link 
+
+    const titleHtml = book.link
       ? `<a href="${book.link}" target="_blank" class="book-title">${book.title}</a>`
       : `<span class="book-title">${book.title}</span>`;
-      
+
     const badgeClass = book.certified ? 'badge-success' : 'badge-danger';
     const badgeText = book.certified ? '可認證' : '不可認證';
 
@@ -210,7 +210,7 @@ async function startCamera() {
 
   cameraSection.style.display = 'flex';
   scanBtn.disabled = true;
-  
+
   try {
     const constraints = {
       video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
@@ -308,7 +308,12 @@ async function processImageWithGemini(canvasSource) {
     const requestBody = {
       contents: [{
         parts: [
-          { text: "請辨識圖片中的書名。只需要回覆書名本身，如果辨識不到請回覆空字串。輸出必須是繁體中文。" },
+          {
+            text: `請辨識這張圖片中的繁體中文文字：
+              1. 若圖片是一本書或書籍封面，請直接提取「書名」即可（不用回覆作者、出版社或對話）。
+  2. 若圖片是一般文字（如手寫字、標語），請直接輸出辨識到的文字。
+  3. 若完全辨識不到任何文字，請回覆空字串。`
+          },
           {
             inline_data: {
               mime_type: "image/jpeg",
@@ -438,7 +443,7 @@ cancelCameraBtn.addEventListener('click', stopCamera);
 function initTheme() {
   const savedTheme = localStorage.getItem('theme');
   const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  
+
   if (savedTheme === 'light') {
     document.documentElement.removeAttribute('data-theme');
     themeToggle.textContent = '☀️';
