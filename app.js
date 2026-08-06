@@ -260,7 +260,7 @@ captureBtn.addEventListener('click', () => {
   cropCtx.drawImage(captureCanvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
 
   stopCamera();
-  processImageWithVisionAPI(cropCanvas);
+  processImageWithOCRSpace(cropCanvas);
 });
 
 // 上傳圖片後呼叫 Vision API
@@ -284,57 +284,52 @@ fileInput.addEventListener('change', (e) => {
       canvas.height = img.height;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0);
-      processImageWithVisionAPI(canvas);
+      processImageWithOCRSpace(canvas);
     };
     img.src = event.target.result;
   };
   reader.readAsDataURL(file);
 });
 
-// 使用 Google Cloud Vision API 進行繁體中文 OCR 辨識
-async function processImageWithVisionAPI(canvasSource) {
+// 使用 OCR.Space API 進行繁體中文 OCR 辨識
+async function processImageWithOCRSpace(canvasSource) {
   const apiKey = getApiKey();
   if (!apiKey) {
-    showToast('請先設定 Google Cloud API 金鑰。', 'error');
+    showToast('請先設定 OCR.Space API 金鑰。', 'error');
     return;
   }
 
-  showToast('正在使用 Google Vision API 辨識書名...', 'info');
+  showToast('正在使用 OCR.Space 辨識書名...', 'info');
 
   try {
-    // 將 Canvas 轉為 base64 編碼的 JPEG 格式（去除 data:image/jpeg;base64, 前綴）
-    const base64Image = canvasSource.toDataURL('image/jpeg', 0.85).split(',')[1];
+    // 將 Canvas 轉為 base64 編碼的 JPEG 格式（包含 data URI 前綴）
+    const base64Image = canvasSource.toDataURL('image/jpeg', 0.85);
 
-    // 組成 Vision API 的請求 Payload
-    const requestBody = {
-      requests: [
-        {
-          image: { content: base64Image },
-          features: [{ type: 'TEXT_DETECTION', maxResults: 1 }],
-          imageContext: {
-            languageHints: ['zh-Hant', 'en'] // 提示繁體中文與英文
-          }
-        }
-      ]
-    };
+    // 建立 FormData 用於 OCR.Space
+    const formData = new FormData();
+    formData.append('apikey', apiKey);
+    formData.append('language', 'cht'); // 繁體中文
+    formData.append('base64Image', base64Image);
 
-    const response = await fetch(
-      `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
-      }
-    );
+    const response = await fetch('https://api.ocr.space/parse/image', {
+      method: 'POST',
+      body: formData
+    });
 
     if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      const errMsg = errData?.error?.message || `HTTP ${response.status}`;
-      throw new Error(errMsg);
+      throw new Error(`HTTP ${response.status}`);
     }
 
     const data = await response.json();
-    const fullText = data.responses?.[0]?.fullTextAnnotation?.text || '';
+    
+    // OCR.Space 錯誤處理
+    if (data.IsErroredOnProcessing) {
+      const errMsg = data.ErrorMessage ? data.ErrorMessage.join(', ') : '辨識處理失敗';
+      throw new Error(errMsg);
+    }
+
+    const parsedResults = data.ParsedResults;
+    const fullText = parsedResults && parsedResults.length > 0 ? parsedResults[0].ParsedText : '';
 
     // 清理 OCR 辨識結果中的雜訊與換行
     const cleanedText = fullText
@@ -352,9 +347,9 @@ async function processImageWithVisionAPI(canvasSource) {
       showToast('未能辨識出文字，請重新拍照或調整對焦。', 'error');
     }
   } catch (error) {
-    console.error('Vision API 辨識錯誤:', error);
-    if (error.message.includes('API key')) {
-      showToast('API 金鑰無效或已過期，請至設定中更新。', 'error');
+    console.error('OCR.Space 辨識錯誤:', error);
+    if (error.message.includes('API key') || error.message.includes('Not valid')) {
+      showToast('API 金鑰無效，請至設定中確認。', 'error');
     } else {
       showToast(`辨識失敗: ${error.message}`, 'error');
     }
