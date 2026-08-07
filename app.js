@@ -418,11 +418,21 @@ if (SpeechRecognition) {
   recognition.lang = 'zh-TW';
   recognition.continuous = false;
   recognition.interimResults = false;
+  let isRecording = false;
 
   micBtn.addEventListener('click', () => {
-    recognition.start();
-    micBtn.classList.add('recording');
-    showToast('請開始說話...', 'info');
+    if (isRecording) {
+      recognition.stop();
+      return;
+    }
+    try {
+      recognition.start();
+      isRecording = true;
+      micBtn.classList.add('recording');
+      showToast('🎤 請說出書名...', 'info');
+    } catch (e) {
+      showToast('語音辨識啟動失敗，請稍後再試。', 'error');
+    }
   });
 
   recognition.addEventListener('result', (event) => {
@@ -433,17 +443,26 @@ if (SpeechRecognition) {
   });
 
   recognition.addEventListener('end', () => {
+    isRecording = false;
     micBtn.classList.remove('recording');
   });
 
   recognition.addEventListener('error', (event) => {
+    isRecording = false;
     micBtn.classList.remove('recording');
-    if (event.error !== 'no-speech') {
-      showToast(`語音辨識錯誤: ${event.error}`, 'error');
-    }
+    const errorMap = {
+      'not-allowed': '麥克風權限被拒，請允許瀏覽器使用麥克風。',
+      'no-speech': '', // 沒說話不提示
+      'network': '語音辨識需要網路連線，請檢查連線狀態。',
+      'audio-capture': '找不到麥克風裝置，請確認麥克風是否已連接。',
+      'service-not-allowed': '語音辨識服務不可用，請確認瀏覽器支援狀況。'
+    };
+    const msg = errorMap[event.error];
+    if (msg) showToast(msg, 'error');
   });
 } else {
-  micBtn.style.display = 'none'; // 若瀏覽器不支援則隱藏麥克風按鈕
+  // 若瀏覽器不支援則隱藏麥克風按鈕
+  micBtn.style.display = 'none';
 }
 
 filterAge.addEventListener('change', applyFiltersAndSearch);
