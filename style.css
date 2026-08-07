@@ -127,7 +127,7 @@ header {
 .input-group input {
   width: 100%;
   padding: 14px 16px;
-  padding-right: 90px; /* 預留空間給語音和清除按鈕 */
+  padding-right: 48px; /* 僅預留清除按鈕空間 */
   border: 1.5px solid var(--border);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.05);
@@ -157,30 +157,47 @@ header {
   line-height: 1;
 }
 
-.input-group .mic-btn {
-  position: absolute;
-  right: 44px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
+/* 語音輸入按鈕 */
+.btn-mic {
+  width: 100%;
+  padding: 11px 20px;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
   cursor: pointer;
-  font-size: 1.4rem;
-  padding: 10px;
-  border-radius: 50%;
-  transition: all 0.3s ease;
-  line-height: 1;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  /* 紫到青的橫向漸層，與主題色系呼應 */
+  background: linear-gradient(135deg, #7c3aed 0%, #06b6d4 100%);
+  color: #ffffff;
+  transition: opacity 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.35);
 }
 
-.input-group .mic-btn.recording {
-  animation: pulse-mic 1.5s infinite;
-  background: rgba(239, 68, 68, 0.1); /* 錄音時的背景提示 */
+.btn-mic:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.45);
+}
+
+.btn-mic:active {
+  transform: translateY(0);
+  opacity: 0.85;
+}
+
+.btn-mic.recording {
+  background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4);
+  animation: pulse-mic 1.4s ease-in-out infinite;
 }
 
 @keyframes pulse-mic {
-  0% { transform: translateY(-50%) scale(1); }
-  50% { transform: translateY(-50%) scale(1.15); }
-  100% { transform: translateY(-50%) scale(1); }
+  0%, 100% { box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4); }
+  50% { box-shadow: 0 4px 24px rgba(239, 68, 68, 0.7); transform: scale(1.01); }
 }
 
 /* Action Buttons Grid */
