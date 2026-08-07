@@ -9,6 +9,7 @@ let videoStream = null;
 // DOM 元素引用
 const searchInput = document.getElementById('search-input');
 const clearBtn = document.getElementById('clear-btn');
+const micBtn = document.getElementById('mic-btn');
 const filterAge = document.getElementById('filter-age');
 const filterCertified = document.getElementById('filter-certified');
 const displayMode = document.getElementById('display-mode');
@@ -409,6 +410,41 @@ clearBtn.addEventListener('click', () => {
   applyFiltersAndSearch();
   searchInput.focus();
 });
+
+// 語音辨識 (Web Speech API)
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (SpeechRecognition) {
+  const recognition = new SpeechRecognition();
+  recognition.lang = 'zh-TW';
+  recognition.continuous = false;
+  recognition.interimResults = false;
+
+  micBtn.addEventListener('click', () => {
+    recognition.start();
+    micBtn.classList.add('recording');
+    showToast('請開始說話...', 'info');
+  });
+
+  recognition.addEventListener('result', (event) => {
+    const transcript = event.results[0][0].transcript;
+    searchInput.value = transcript;
+    applyFiltersAndSearch();
+    showToast(`聽到: "${transcript}"`, 'success');
+  });
+
+  recognition.addEventListener('end', () => {
+    micBtn.classList.remove('recording');
+  });
+
+  recognition.addEventListener('error', (event) => {
+    micBtn.classList.remove('recording');
+    if (event.error !== 'no-speech') {
+      showToast(`語音辨識錯誤: ${event.error}`, 'error');
+    }
+  });
+} else {
+  micBtn.style.display = 'none'; // 若瀏覽器不支援則隱藏麥克風按鈕
+}
 
 filterAge.addEventListener('change', applyFiltersAndSearch);
 filterCertified.addEventListener('change', applyFiltersAndSearch);
