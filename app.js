@@ -420,18 +420,31 @@ if (SpeechRecognition) {
   recognition.interimResults = false;
   let isRecording = false;
 
+  const micLabel = micBtn.querySelector('.mic-label');
+
+  const stopRecording = () => {
+    isRecording = false;
+    micBtn.classList.remove('recording');
+    if (micLabel) micLabel.textContent = '🎤 語音輸入書名';
+    try { recognition.stop(); } catch (e) {}
+  };
+
   micBtn.addEventListener('click', () => {
     if (isRecording) {
-      recognition.stop();
+      stopRecording();
       return;
     }
+    
     try {
       recognition.start();
       isRecording = true;
       micBtn.classList.add('recording');
+      if (micLabel) micLabel.textContent = '🛑 點擊停止錄音 (辨識中...)';
       showToast('🎤 請說出書名...', 'info');
     } catch (e) {
-      showToast('語音辨識啟動失敗，請稍後再試。', 'error');
+      console.error('語音辨識啟動失敗', e);
+      showToast('無法啟動語音辨識，請稍後再試。', 'error');
+      stopRecording();
     }
   });
 
@@ -443,20 +456,22 @@ if (SpeechRecognition) {
   });
 
   recognition.addEventListener('end', () => {
-    isRecording = false;
-    micBtn.classList.remove('recording');
+    stopRecording();
   });
 
   recognition.addEventListener('error', (event) => {
-    isRecording = false;
-    micBtn.classList.remove('recording');
+    stopRecording();
+    console.error('語音辨識錯誤:', event.error);
+    
     const errorMap = {
       'not-allowed': '麥克風權限被拒，請允許瀏覽器使用麥克風。',
-      'no-speech': '', // 沒說話不提示
-      'network': '語音辨識需要網路連線，請檢查連線狀態。',
-      'audio-capture': '找不到麥克風裝置，請確認麥克風是否已連接。',
-      'service-not-allowed': '語音辨識服務不可用，請確認瀏覽器支援狀況。'
+      'network': '語音辨識需要網路連線，請檢查網路狀態。',
+      'audio-capture': '找不到麥克風，請確認麥克風已連接。',
+      'service-not-allowed': '語音服務不可用，請確認瀏覽器支援狀況。',
+      'aborted': '語音辨識已中斷。',
+      'no-speech': '未偵測到語音，請再試一次。'
     };
+    
     const msg = errorMap[event.error];
     if (msg) showToast(msg, 'error');
   });
