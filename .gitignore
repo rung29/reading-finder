@@ -7,3 +7,7 @@ __pycache__/
 
 # 爬蟲暫存檔案
 books_page_*.html
+
+# 環境變數與金鑰
+.env*
+!.env.local.example

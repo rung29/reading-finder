@@ -51,9 +51,15 @@ const API_KEY_STORAGE_KEY = 'vision_api_key';
 async function init() {
   showToast('正在載入書籍資料庫...');
   try {
-    const response = await fetch('books.json');
-    if (!response.ok) throw new Error('無法讀取 books.json');
-    booksData = await response.json();
+    let result = null;
+    if (window.ReadingFinderDataLoader && typeof window.ReadingFinderDataLoader.load === 'function') {
+      result = await window.ReadingFinderDataLoader.load('books.json');
+      booksData = result.data;
+    } else {
+      const response = await fetch('books.json');
+      if (!response.ok) throw new Error('無法讀取 books.json');
+      booksData = await response.json();
+    }
 
     // 初始化 Fuse.js 模糊搜尋引擎
     const options = {
@@ -69,7 +75,8 @@ async function init() {
 
     // 預設載入全部書籍並渲染
     applyFiltersAndSearch();
-    showToast(`成功載入 ${booksData.length} 本書籍！`, 'success');
+    const sourceLabel = result && result.source === 'supabase' ? '（雲端最新）' : '（本機）';
+    showToast(`成功載入 ${booksData.length} 本書籍 ${sourceLabel}！`, 'success');
   } catch (error) {
     console.error('初始化失敗:', error);
     showToast('書籍資料載入失敗，請確認網路連線。', 'error');

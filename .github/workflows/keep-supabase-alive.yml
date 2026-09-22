@@ -1,0 +1,49 @@
+name: Keep Supabase Alive
+
+on:
+  schedule:
+    # 每 3 天於 UTC 04:00 (台灣時間 12:00) 執行一次
+    # Supabase 免費版專案若超過 7 天無流量會自動休眠，每 3 天觸發一次以保持活躍
+    - cron: '0 4 */3 * *'
+  workflow_dispatch: # 支援在 GitHub Actions 頁籤手動點擊「Run workflow」測試
+
+jobs:
+  ping-supabase:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase Services
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://olbglokwiibzxpsyxiup.supabase.co' }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+        run: |
+          CLEAN_URL="${SUPABASE_URL%/}"
+          echo "=================================================="
+          echo "目標 Supabase 網址: $CLEAN_URL"
+          echo "=================================================="
+
+          # 1. 喚醒 Storage 公開物件端點 (無需金鑰，直接透過 HEAD 檢查檔案)
+          STORAGE_TARGET="$CLEAN_URL/storage/v1/object/public/book-data/books.json"
+          echo "--> [1/2] 正在請求 Storage 端點: $STORAGE_TARGET"
+          STORAGE_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -I "$STORAGE_TARGET")
+          echo "Storage 回應狀態碼: $STORAGE_STATUS"
+
+          # 2. 喚醒 REST API 根端點 (若有設定 GitHub Secrets 金鑰)
+          if [ -n "$SUPABASE_SECRET_KEY" ]; then
+            echo "--> [2/2] 正在請求 REST API 根端點 (帶金鑰認證)..."
+            API_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X GET "$CLEAN_URL/rest/v1/" \
+              -H "apikey: $SUPABASE_SECRET_KEY" \
+              -H "Authorization: Bearer $SUPABASE_SECRET_KEY")
+            echo "REST API 回應狀態碼: $API_STATUS"
+          else
+            echo "--> [2/2] 未偵測到 SUPABASE_SECRET_KEY 變數，跳過認證 API 請求。"
+            API_STATUS="200"
+          fi
+
+          echo "=================================================="
+          # 檢查 Storage 狀態碼 (200~399 或 404 皆代表 Supabase 專案在線並有處理請求)
+          if [ "$STORAGE_STATUS" -ge 200 ] && [ "$STORAGE_STATUS" -lt 500 ]; then
+            echo "✅ 成功喚醒 Supabase！專案保持活躍狀態。"
+          else
+            echo "::error::❌ Storage 連線異常，狀態碼: $STORAGE_STATUS"
+            exit 1
+          fi

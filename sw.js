@@ -1,8 +1,10 @@
-const CACHE_NAME = 'reading-finder-v9';
+const CACHE_NAME = 'reading-finder-v10';
 const ASSETS = [
   './',
   './index.html',
   './style.css',
+  './data_source_config.js',
+  './data_loader.js',
   './app.js',
   './manifest.json',
   './books.json',
