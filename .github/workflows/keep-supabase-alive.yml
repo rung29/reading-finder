@@ -13,10 +13,12 @@ jobs:
     steps:
       - name: Ping Supabase Services
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://olbglokwiibzxpsyxiup.supabase.co' }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
         run: |
-          CLEAN_URL="${SUPABASE_URL%/}"
+          # 若無設定 GitHub Secret 則使用預設專案網址
+          TARGET_URL="${SUPABASE_URL:-https://olbglokwiibzxpsyxiup.supabase.co}"
+          CLEAN_URL="${TARGET_URL%/}"
           echo "=================================================="
           echo "目標 Supabase 網址: $CLEAN_URL"
           echo "=================================================="
