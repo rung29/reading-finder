@@ -338,6 +338,16 @@ header {
   gap: 10px;
 }
 
+.filter-controls .select-wrapper {
+  flex: 1;
+  min-width: 0;
+}
+
+.filter-controls .select-wrapper select {
+  width: 100%;
+  text-overflow: ellipsis;
+}
+
 .select-wrapper select {
   padding: 8px 12px;
   border-radius: 8px;
