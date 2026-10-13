@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 const {
   normalizeSimilarTitle,
+  seriesKey,
   buildSimilarTitleGroups
 } = require('../title_groups.js');
 
@@ -37,4 +38,33 @@ test('does not merge books that only share a series-like prefix', () => {
   ]);
 
   assert.deepEqual(groups, []);
+});
+
+test('merges numbered series with colon subtitles', () => {
+  const titles = [
+    '少年廚俠1：兩王的心結',
+    '少年廚俠2：西湖鳴冤記',
+    '少年廚俠3：消失的魔石',
+    '少年廚俠4：除魔大神仙',
+    '少年廚俠5：陰謀與真相'
+  ];
+
+  assert.equal(new Set(titles.map(seriesKey)).size, 1);
+  assert.deepEqual(buildSimilarTitleGroups(titles.map(title => ({ title })))[0], {
+    key: '少年廚俠',
+    label: '少年廚俠',
+    count: 5
+  });
+});
+
+test('merges a series whose books differ only by colon subtitles', () => {
+  assert.equal(
+    seriesKey('魔法校車：電路大冒險'),
+    seriesKey('魔法校車：人體神秘遊')
+  );
+});
+
+test('merges series whose volume number is at the end', () => {
+  assert.equal(seriesKey('少年廚俠1'), seriesKey('少年廚俠5'));
+  assert.equal(seriesKey('漫畫科學王第1冊'), seriesKey('漫畫科學王第2冊'));
 });

@@ -114,7 +114,7 @@ function populateSimilarTitleGroups() {
   const options = document.createDocumentFragment();
 
   booksData.forEach(book => {
-    similarTitleKey.set(book, titleGroups.normalizeSimilarTitle(book.title));
+    similarTitleKey.set(book, titleGroups.seriesKey(book.title));
   });
 
   groups.forEach(group => {

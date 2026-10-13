@@ -13,7 +13,7 @@
 - `books.json` - 解析後的結構化書籍資料庫。
 - `index.html` - 網頁應用程式主介面。
 - `app.js` - 前端邏輯核心（包含模糊搜尋、相機拍照、上傳檔案以及 OCR API 串接）。
-- `title_groups.js` - 將同名或僅有標點、常見字形與版本註記差異的書籍整理成相似書名群組。
+- `title_groups.js` - 忽略副標題、集數／冊次、標點、常見字形與版本註記，將同系列書籍整理成相似書名群組。
 - `style.css` - 現代化毛玻璃質感（Glassmorphism）與深淺主題的樣式設定。
 - `manifest.json` - PWA 應用程式設定檔（提供「新增至主畫面」功能）。
 - `sw.js` - Service Worker 快取腳本（實現無網路離線查詢）。
