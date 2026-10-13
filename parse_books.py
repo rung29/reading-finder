@@ -99,7 +99,8 @@ def main():
                 
     # 寫入 JSON
     with open(target_json, "w", encoding="utf-8") as f:
-        json.dump(all_books, f, ensure_ascii=False, indent=2)
+        # 線上書單不需要縮排；緊湊格式可減少下載量與 JSON 解析前的等待時間。
+        json.dump(all_books, f, ensure_ascii=False, separators=(",", ":"))
         
     print(f"\n轉換完成！共解析 {len(html_files)} 個 HTML 檔，取得 {len(all_books)} 本書籍。")
     print(f"已儲存至: {target_json}")

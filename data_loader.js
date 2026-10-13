@@ -19,6 +19,13 @@
     return `${url}${separator}v=${Date.now()}`;
   }
 
+  function versioned(url) {
+    const version = String(config.booksVersion || "").trim();
+    if (!version) return url;
+    const separator = url.includes("?") ? "&" : "?";
+    return `${url}${separator}v=${encodeURIComponent(version)}`;
+  }
+
   async function fetchJson(url, isCloud = false) {
     const controller = new AbortController();
     const timer = global.setTimeout(() => controller.abort(), timeoutMs);
@@ -104,7 +111,7 @@
     }
 
     try {
-      const data = await fetchJson(fileName, false);
+      const data = await fetchJson(versioned(fileName), false);
       showSourceNotice(
         supabaseBaseUrl
           ? "⚠️ Supabase 連線逾時或失敗，已切換至本機備援"
