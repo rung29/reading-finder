@@ -67,6 +67,28 @@ def fetch_search_session():
     
     return session, csrf_token
 
+def extract_pagination_info(soup):
+    """
+    從分頁區塊 (ul.pagination) 解析當前 active 頁碼以及最大頁數
+    """
+    actual_page = None
+    active_el = soup.select_one("ul.pagination li.active")
+    if active_el and active_el.get_text(strip=True).isdigit():
+        actual_page = int(active_el.get_text(strip=True))
+
+    page_nums = []
+    for a in soup.select("ul.pagination a"):
+        href = a.get("href", "")
+        m = re.search(r'page=(\d+)', href)
+        if m:
+            page_nums.append(int(m.group(1)))
+        text = a.get_text(strip=True)
+        if text.isdigit():
+            page_nums.append(int(text))
+
+    total_pages = max(page_nums) if page_nums else actual_page
+    return actual_page, total_pages
+
 def perform_search(session, csrf_token, readrang, testing, keywords, captcha_code):
     """
     發送 POST 搜尋請求以設定伺服器 Session 中的搜尋過濾條件
@@ -94,7 +116,7 @@ def perform_search(session, csrf_token, readrang, testing, keywords, captcha_cod
         response.raise_for_status()
     except requests.RequestException as e:
         print(f"發送搜尋請求失敗：{e}", file=sys.stderr)
-        return False
+        return False, None
         
     # 檢查是否彈出驗證碼錯誤的 JavaScript 警告
     soup = BeautifulSoup(response.text, "html.parser")
@@ -104,9 +126,10 @@ def perform_search(session, csrf_token, readrang, testing, keywords, captcha_cod
             # 取得警告內容，例如 "請輸入驗證碼" 或 "驗證碼錯誤"
             alert_text = s.string.strip()
             print(f"\n❌ 搜尋被拒絕，伺服器訊息：{alert_text}", file=sys.stderr)
-            return False
+            return False, None
 
-    return True
+    _, total_pages = extract_pagination_info(soup)
+    return True, total_pages
 
 def fetch_books_by_page(session, page_number):
     """
@@ -129,9 +152,10 @@ def fetch_books_by_page(session, page_number):
         response.raise_for_status()
     except requests.RequestException as e:
         print(f"抓取第 {page_number} 頁失敗：{e}", file=sys.stderr)
-        return None
+        return None, None
         
     soup = BeautifulSoup(response.text, "html.parser")
+    actual_page, total_pages = extract_pagination_info(soup)
     book_elements = soup.select("div.book-group")
     page_text = soup.get_text(" ", strip=True)
     if not book_elements and not any(
@@ -192,7 +216,11 @@ def fetch_books_by_page(session, page_number):
             f"推薦書單第 {page_number} 頁有結果區塊，但無法解析任何書名"
         )
 
-    return books
+    page_info = {
+        "actual_page": actual_page,
+        "total_pages": total_pages
+    }
+    return books, page_info
 
 def save_to_html(books, page_number, readrang_name, testing_name, keywords):
     """
@@ -297,14 +325,14 @@ def main():
     print("=======================================================\n")
     
     # 選擇年段（支援複選）
-    print("【1】請選擇適讀年段 (可複選，請以空格隔開，例如：1 2)：")
+    print("【1】請選擇適讀年段 (可複選，支援空白、逗號或範圍，例如：1 2 或 1-3)：")
     print(" 0. 全部年段 (預設)")
     print(" 1. 國小低年級")
     print(" 2. 國小中年級")
     print(" 3. 國小高年級")
     print(" 4. 國中")
     print(" 5. 其他")
-    rang_input = input("請選擇 (0-5，可複選)：").strip()
+    rang_input = input("請選擇 (0-5，可複選/範圍)：").strip()
     
     readrang_map = {
         "1": "國小低年級",
@@ -314,23 +342,49 @@ def main():
         "5": "其他"
     }
 
-    # 解析使用者輸入的年段選項
-    raw_choices = [c for c in re.split(r'[\s,]+', rang_input) if c]
-    valid_choices = [c for c in raw_choices if c in readrang_map]
+    # 解析使用者輸入的年段選項（支援「1 2」、「1,2」、「1-3」、「1~3」等格式）
+    raw_tokens = [c for c in re.split(r'[\s,]+', rang_input) if c]
+    expanded_choices = set()
+    for token in raw_tokens:
+        if '-' in token or '~' in token:
+            parts = re.split(r'[-~]', token)
+            if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+                start, end = int(parts[0]), int(parts[1])
+                for num in range(min(start, end), max(start, end) + 1):
+                    expanded_choices.add(str(num))
+                continue
+        expanded_choices.add(token)
 
-    # 判斷是否為全部年段 (未輸入、包含 0、無有效選項或全選)
-    if not raw_choices or "0" in raw_choices or len(valid_choices) == 0 or len(valid_choices) == len(readrang_map):
+    valid_choices = sorted([c for c in expanded_choices if c in readrang_map], key=lambda x: int(x))
+
+    # 判斷是否為全部年段 (未輸入、包含 0 或全選)
+    if not raw_tokens or "0" in expanded_choices or len(valid_choices) == len(readrang_map):
+        server_readrang = "all"
+        selected_range_names = None
+        readrang_display_name = "全部年段"
+    elif len(valid_choices) == 0:
+        print("⚠️ 未識別到有效的年段選項，自動套用「全部年段」。")
         server_readrang = "all"
         selected_range_names = None
         readrang_display_name = "全部年段"
     elif len(valid_choices) == 1:
         server_readrang = valid_choices[0]
-        selected_range_names = {readrang_map[valid_choices[0]]}
+        # 若選 5 (其他)，包含網站可能呈現的「高中」與「其他」
+        target_names = {"其他", "高中"} if valid_choices[0] == "5" else {readrang_map[valid_choices[0]]}
+        selected_range_names = target_names
         readrang_display_name = readrang_map[valid_choices[0]]
     else:
+        # 複選時遠端伺服器不支援多重參數，因此向伺服器請求全選後由本機進行聯集過濾
         server_readrang = "all"
-        selected_range_names = {readrang_map[c] for c in valid_choices}
+        selected_range_names = set()
+        for c in valid_choices:
+            if c == "5":
+                selected_range_names.update(["其他", "高中"])
+            else:
+                selected_range_names.add(readrang_map[c])
         readrang_display_name = "、".join([readrang_map[c] for c in valid_choices])
+
+    print(f"👉 已設定適讀年段：{readrang_display_name}")
     
     # 選擇認證狀態
     print("\n【2】請選擇認證狀態：")
@@ -364,16 +418,19 @@ def main():
     captcha_code = input("請輸入 4 位數驗證碼：").strip()
     
     # 執行搜尋
-    success = perform_search(session, csrf_token, server_readrang, testing, keywords, captcha_code)
+    success, total_pages = perform_search(session, csrf_token, server_readrang, testing, keywords, captcha_code)
     if not success:
         print("\n❌ 搜尋初始化失敗，程式結束。請確認驗證碼是否輸入正確，然後重新執行程式。")
         sys.exit(1)
         
     print("\n✅ 搜尋初始化成功！已成功套用您的篩選條件。")
+    if total_pages:
+        print(f"📊 本次搜尋條件共找到約 {total_pages} 頁書籍資料。")
     
     # 迴圈讓使用者抓取多個頁碼或範圍
     while True:
-        page_input = input("\n請輸入要下載的頁碼或範圍 (例如：1 或 1-5，輸入 q 退出)：").strip()
+        prompt_hint = f"1-{total_pages}" if total_pages else "1-5"
+        page_input = input(f"\n請輸入要下載的頁碼或範圍 (例如：1 或 {prompt_hint}，輸入 q 退出)：").strip()
         if page_input.lower() == 'q':
             print("感謝使用！程式已結束。")
             break
@@ -391,26 +448,68 @@ def main():
                     raise ValueError
                 pages_to_fetch = [page_number]
         except ValueError:
-            print("請輸入有效的頁碼格式 (正整數，例如 1 或 1-5)！")
+            print(f"請輸入有效的頁碼格式 (正整數，例如 1 或 {prompt_hint})！")
             continue
             
         import time
+        last_page_signatures = None
+        last_page_number = None
+        all_seen_signatures = set()
+
         for page_number in pages_to_fetch:
             print(f"正在抓取第 {page_number} 頁...")
             try:
-                books = fetch_books_by_page(session, page_number)
+                books, page_info = fetch_books_by_page(session, page_number)
             except SourceStructureError as exc:
                 print(f"來源格式異常：{exc}", file=sys.stderr)
                 continue
-            if books:
+
+            if books is not None:
+                actual_page = page_info.get("actual_page") if page_info else None
+
+                # 依據 1：伺服器實際分頁頁碼小於請求頁碼（伺服器已觸及最大頁數並固定回傳末頁）
+                if actual_page is not None and actual_page < page_number:
+                    print(f"\n🛑 伺服器已到達最後一頁（第 {actual_page} 頁），請求的第 {page_number} 頁已超出範圍。")
+                    print(f"👉 書單已全部搜尋到底，中止後續下載！")
+                    break
+
+                # 提取書籍特徵識別簽名（優先使用書籍詳細頁 ID，其次為書名+作者+出版社組合）
+                def get_book_sig(b):
+                    url = b.get("url", "")
+                    m = re.search(r'id=(\d+)', url)
+                    if m:
+                        return f"id:{m.group(1)}"
+                    return f"text:{b.get('title', '')}|{b.get('author', '')}|{b.get('publisher', '')}"
+
+                current_signatures = [get_book_sig(b) for b in books]
+
+                # 依據 2：當前頁原始書單內容與上一頁完全重複
+                if last_page_signatures and len(current_signatures) > 0 and current_signatures == last_page_signatures:
+                    print(f"\n🛑 偵測到第 {page_number} 頁的書單內容與上一頁（第 {last_page_number} 頁）完全重複！")
+                    print(f"👉 代表已搜尋到底（共 {last_page_number} 頁），中止後續搜尋。")
+                    break
+
+                # 依據 3：當前頁所有書籍在先前頁面均已出現過（全數重複書單）
+                if all_seen_signatures and len(current_signatures) > 0 and all(sig in all_seen_signatures for sig in current_signatures):
+                    print(f"\n🛑 偵測到第 {page_number} 頁的書籍在先前頁面皆已存在（重複書單）！")
+                    print(f"👉 代表已搜尋到底，中止後續搜尋。")
+                    break
+
+                # 記錄本頁特徵
+                last_page_signatures = current_signatures
+                last_page_number = page_number
+                all_seen_signatures.update(current_signatures)
+
                 # 若為複選年段，在本地端進行聯集過濾
+                filtered_books = books
                 if selected_range_names:
-                    books = [b for b in books if b.get("range", "").strip() in selected_range_names]
+                    filtered_books = [b for b in books if b.get("range", "").strip() in selected_range_names]
     
-                if books:
-                    save_to_html(books, page_number, readrang_display_name, testing_name, keywords)
+                if filtered_books:
+                    save_to_html(filtered_books, page_number, readrang_display_name, testing_name, keywords)
                 else:
                     print(f"\n第 {page_number} 頁抓取到的書籍中，沒有符合選擇年段 ({readrang_display_name}) 的項目。")
+
                 # 在抓取成功後，刪除暫存的驗證碼圖片檔案
                 captcha_path = os.path.join(os.getcwd(), "captcha.png")
                 if os.path.exists(captcha_path):
