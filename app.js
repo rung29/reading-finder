@@ -5,6 +5,9 @@ let fuseInstance = null;
 let currentPage = 1;
 let pageSize = 20; // 預設每頁顯示 20 筆
 let videoStream = null;
+let searchTimer = null;
+const SEARCH_DEBOUNCE_MS = 120;
+const searchableText = new WeakMap();
 
 // DOM 元素引用
 const searchInput = document.getElementById('search-input');
@@ -73,6 +76,13 @@ async function init() {
     };
     fuseInstance = new Fuse(booksData, options);
 
+    // 預先整理常用搜尋文字；之後每次輸入不用重複正規化 3 個欄位。
+    booksData.forEach(book => {
+      searchableText.set(book, normalizeSearchText(
+        `${book.title || ''} ${book.author || ''} ${book.publisher || ''}`
+      ));
+    });
+
     // 預設載入全部書籍並渲染
     applyFiltersAndSearch();
     const sourceLabel = result && result.source === 'supabase' ? '（雲端最新）' : '（本機）';
@@ -81,6 +91,13 @@ async function init() {
     console.error('初始化失敗:', error);
     showToast('書籍資料載入失敗，請確認網路連線。', 'error');
   }
+}
+
+function normalizeSearchText(value) {
+  return String(value)
+    .normalize('NFKC')
+    .toLocaleLowerCase('zh-TW')
+    .replace(/[\s·‧・,，。:：;；、!！?？()（）\[\]【】《》〈〉「」『』]/g, '');
 }
 
 // 2. 顯示 Toast 訊息
@@ -104,8 +121,15 @@ function applyFiltersAndSearch() {
   // 第一階段：模糊搜尋或返回全部
   let results = [];
   if (query && fuseInstance) {
-    const fuseResults = fuseInstance.search(query);
-    results = fuseResults.map(r => r.item);
+    const normalizedQuery = normalizeSearchText(query);
+    const directMatches = normalizedQuery
+      ? booksData.filter(book => searchableText.get(book).includes(normalizedQuery))
+      : [];
+
+    // 大多數書名查詢可用一次線性比對完成；只有無直接命中時才做較昂貴的模糊搜尋。
+    results = directMatches.length > 0
+      ? directMatches
+      : fuseInstance.search(query).map(result => result.item);
   } else {
     results = [...booksData];
   }
@@ -411,8 +435,12 @@ settingsModal.addEventListener('click', (e) => {
 // 7. 事件綁定
 // ============================================================
 
-searchInput.addEventListener('input', applyFiltersAndSearch);
+searchInput.addEventListener('input', () => {
+  window.clearTimeout(searchTimer);
+  searchTimer = window.setTimeout(applyFiltersAndSearch, SEARCH_DEBOUNCE_MS);
+});
 clearBtn.addEventListener('click', () => {
+  window.clearTimeout(searchTimer);
   searchInput.value = '';
   applyFiltersAndSearch();
   searchInput.focus();
