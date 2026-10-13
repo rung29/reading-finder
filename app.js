@@ -8,13 +8,14 @@ let videoStream = null;
 let searchTimer = null;
 const SEARCH_DEBOUNCE_MS = 120;
 const searchableText = new WeakMap();
+const similarTitleKey = new WeakMap();
 
 // DOM 元素引用
 const searchInput = document.getElementById('search-input');
 const clearBtn = document.getElementById('clear-btn');
 const micBtn = document.getElementById('mic-btn');
 const filterAge = document.getElementById('filter-age');
-const filterCertified = document.getElementById('filter-certified');
+const filterTitleGroup = document.getElementById('filter-title-group');
 const displayMode = document.getElementById('display-mode');
 const resultsCount = document.getElementById('results-count');
 const bookListContainer = document.getElementById('book-list');
@@ -82,6 +83,7 @@ async function init() {
         `${book.title || ''} ${book.author || ''} ${book.publisher || ''}`
       ));
     });
+    populateSimilarTitleGroups();
 
     // 預設載入全部書籍並渲染
     applyFiltersAndSearch();
@@ -100,6 +102,32 @@ function normalizeSearchText(value) {
     .replace(/[\s·‧・,，。:：;；、!！?？()（）\[\]【】《》〈〉「」『』]/g, '');
 }
 
+function populateSimilarTitleGroups() {
+  const titleGroups = window.ReadingFinderTitleGroups;
+  if (!titleGroups) {
+    console.warn('相似書名分組模組未載入');
+    filterTitleGroup.disabled = true;
+    return;
+  }
+
+  const groups = titleGroups.buildSimilarTitleGroups(booksData);
+  const options = document.createDocumentFragment();
+
+  booksData.forEach(book => {
+    similarTitleKey.set(book, titleGroups.normalizeSimilarTitle(book.title));
+  });
+
+  groups.forEach(group => {
+    const option = document.createElement('option');
+    option.value = group.key;
+    option.textContent = `${group.label}（${group.count} 本）`;
+    options.appendChild(option);
+  });
+
+  filterTitleGroup.appendChild(options);
+  filterTitleGroup.disabled = groups.length === 0;
+}
+
 // 2. 顯示 Toast 訊息
 function showToast(message, type = 'info') {
   toastText.textContent = message;
@@ -113,7 +141,7 @@ function showToast(message, type = 'info') {
 function applyFiltersAndSearch() {
   const query = searchInput.value.trim();
   const ageFilter = filterAge.value;
-  const certifiedFilter = filterCertified.value;
+  const titleGroupFilter = filterTitleGroup.value;
 
   // 顯示清除按鈕
   clearBtn.style.display = query ? 'block' : 'none';
@@ -139,10 +167,9 @@ function applyFiltersAndSearch() {
     results = results.filter(book => book.age_group.includes(ageFilter));
   }
 
-  // 第三階段：認證狀態篩選
-  if (certifiedFilter !== "") {
-    const isCertified = certifiedFilter === "true";
-    results = results.filter(book => book.certified === isCertified);
+  // 第三階段：相似書名群組篩選
+  if (titleGroupFilter) {
+    results = results.filter(book => similarTitleKey.get(book) === titleGroupFilter);
   }
 
   filteredBooks = results;
@@ -516,7 +543,13 @@ if (SpeechRecognition) {
 }
 
 filterAge.addEventListener('change', applyFiltersAndSearch);
-filterCertified.addEventListener('change', applyFiltersAndSearch);
+filterTitleGroup.addEventListener('change', () => {
+  // 群組選擇代表一次完整導覽，避免舊的關鍵字或年段條件隱藏群組成員。
+  window.clearTimeout(searchTimer);
+  searchInput.value = '';
+  filterAge.value = '';
+  applyFiltersAndSearch();
+});
 displayMode.addEventListener('change', () => {
   currentPage = 1;
   renderResults();
