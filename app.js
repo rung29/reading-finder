@@ -45,11 +45,19 @@ const toastText = document.getElementById('toast-text');
 const openSettingsBtn = document.getElementById('open-settings-btn');
 const settingsModal = document.getElementById('settings-modal');
 const apiKeyInput = document.getElementById('api-key-input');
+const geminiModelSelect = document.getElementById('gemini-model-select');
 const saveSettingsBtn = document.getElementById('save-settings-btn');
 const closeSettingsBtn = document.getElementById('close-settings-btn');
 
 // API Key 在 localStorage 中的儲存鍵名
 const API_KEY_STORAGE_KEY = 'vision_api_key';
+const GEMINI_MODEL_STORAGE_KEY = 'vision_gemini_model';
+const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
+const GEMINI_MODEL_VALUES = [
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-2.5-pro'
+];
 
 // 1. 初始化載入書籍資料
 async function init() {
@@ -294,6 +302,11 @@ function getApiKey() {
   return localStorage.getItem(API_KEY_STORAGE_KEY) || '';
 }
 
+function getGeminiModel() {
+  const savedModel = localStorage.getItem(GEMINI_MODEL_STORAGE_KEY);
+  return GEMINI_MODEL_VALUES.includes(savedModel) ? savedModel : DEFAULT_GEMINI_MODEL;
+}
+
 // 檢查 API Key 是否已設定，若無則提示使用者
 function ensureApiKey() {
   const key = getApiKey();
@@ -401,7 +414,8 @@ async function processImageWithGemini(canvasSource) {
     return;
   }
 
-  showToast('正在使用 Gemini API 辨識書名...', 'info');
+  const model = getGeminiModel();
+  showToast(`正在使用 ${model} 辨識書名...`, 'info');
 
   try {
     // 將 Canvas 轉為 base64 編碼的 JPEG 格式，Gemini API 需要純 Base64 字串（無前綴）
@@ -426,7 +440,7 @@ async function processImageWithGemini(canvasSource) {
       }]
     };
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(requestBody)
@@ -473,15 +487,20 @@ async function processImageWithGemini(canvasSource) {
 // 開啟設定彈窗
 openSettingsBtn.addEventListener('click', () => {
   apiKeyInput.value = getApiKey();
+  geminiModelSelect.value = getGeminiModel();
   settingsModal.classList.remove('hidden');
 });
 
 // 儲存 API Key
 saveSettingsBtn.addEventListener('click', () => {
   const key = apiKeyInput.value.trim();
+  const model = GEMINI_MODEL_VALUES.includes(geminiModelSelect.value)
+    ? geminiModelSelect.value
+    : DEFAULT_GEMINI_MODEL;
+  localStorage.setItem(GEMINI_MODEL_STORAGE_KEY, model);
   if (key) {
     localStorage.setItem(API_KEY_STORAGE_KEY, key);
-    showToast('API 金鑰已成功儲存！', 'success');
+    showToast(`API 金鑰與 ${model} 設定已成功儲存！`, 'success');
   } else {
     localStorage.removeItem(API_KEY_STORAGE_KEY);
     showToast('已清除 API 金鑰。', 'info');
