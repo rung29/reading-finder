@@ -333,9 +333,16 @@ header {
 /* Filter Controls */
 .filter-controls {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   gap: 10px;
+}
+
+.filter-label {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .filter-controls .select-wrapper {
@@ -387,6 +394,88 @@ header {
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
   border-color: var(--accent);
+}
+
+/* Similar title groups */
+.groups-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.groups-header h2 {
+  color: var(--text-primary);
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.group-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.group-card {
+  overflow: hidden;
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-sm);
+}
+
+.group-toggle-btn {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.98rem;
+  font-weight: 700;
+  text-align: left;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.group-toggle-btn:hover {
+  background: rgba(99, 102, 241, 0.08);
+  color: var(--accent);
+}
+
+.group-count-tag {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.14);
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.group-arrow {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.group-toggle-btn[aria-expanded="true"] .group-arrow {
+  color: var(--accent);
+  transform: rotate(180deg);
+}
+
+.group-items {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-top: 1px solid var(--border);
+  background: rgba(99, 102, 241, 0.05);
 }
 
 .book-header {

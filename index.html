@@ -81,20 +81,10 @@
         </div>
 
         <div class="filter-controls">
+          <label class="filter-label" for="filter-age">適讀年級</label>
           <div class="select-wrapper">
             <select id="filter-age">
-              <option value="">全部適讀年段</option>
-              <option value="低年級">國小低年級</option>
-              <option value="中年級">國小中年級</option>
-              <option value="高年級">國小高年級</option>
-              <option value="國中">國中</option>
-              <option value="高中">高中</option>
-            </select>
-          </div>
-
-          <div class="select-wrapper">
-            <select id="filter-title-group" aria-label="相似書名群組">
-              <option value="">所有書名</option>
+              <option value="">全部適讀年級</option>
             </select>
           </div>
         </div>
@@ -111,6 +101,14 @@
         </div>
       </div>
     </main>
+
+    <!-- 相似書名群組區 -->
+    <section class="glass-card groups-section hidden" id="groups-section">
+      <div class="groups-header">
+        <h2>📂 相似書名群組</h2>
+      </div>
+      <div class="group-list" id="groups-list"></div>
+    </section>
 
     <!-- 搜尋結果區 -->
     <div class="book-list" id="book-list">

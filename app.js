@@ -8,17 +8,17 @@ let videoStream = null;
 let searchTimer = null;
 const SEARCH_DEBOUNCE_MS = 120;
 const searchableText = new WeakMap();
-const similarTitleKey = new WeakMap();
 
 // DOM 元素引用
 const searchInput = document.getElementById('search-input');
 const clearBtn = document.getElementById('clear-btn');
 const micBtn = document.getElementById('mic-btn');
 const filterAge = document.getElementById('filter-age');
-const filterTitleGroup = document.getElementById('filter-title-group');
 const displayMode = document.getElementById('display-mode');
 const resultsCount = document.getElementById('results-count');
 const bookListContainer = document.getElementById('book-list');
+const groupsSection = document.getElementById('groups-section');
+const groupsList = document.getElementById('groups-list');
 const themeToggle = document.getElementById('theme-toggle');
 const offlineBanner = document.getElementById('offline-banner');
 
@@ -83,7 +83,7 @@ async function init() {
         `${book.title || ''} ${book.author || ''} ${book.publisher || ''}`
       ));
     });
-    populateSimilarTitleGroups();
+    populateGradeFilter();
 
     // 預設載入全部書籍並渲染
     applyFiltersAndSearch();
@@ -102,30 +102,86 @@ function normalizeSearchText(value) {
     .replace(/[\s·‧・,，。:：;；、!！?？()（）\[\]【】《》〈〉「」『』]/g, '');
 }
 
-function populateSimilarTitleGroups() {
-  const titleGroups = window.ReadingFinderTitleGroups;
-  if (!titleGroups) {
-    console.warn('相似書名分組模組未載入');
-    filterTitleGroup.disabled = true;
+function catalogFilters() {
+  return window.ReadingFinderTitleGroups;
+}
+
+function populateGradeFilter() {
+  const filters = catalogFilters();
+  if (!filters) {
+    console.warn('書單篩選模組未載入');
+    filterAge.disabled = true;
     return;
   }
 
-  const groups = titleGroups.buildSimilarTitleGroups(booksData);
-  const options = document.createDocumentFragment();
+  const options = filters.gradeOptions(booksData);
+  filterAge.innerHTML = '<option value="">全部適讀年級</option>'
+    + options.map(option =>
+      `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}（${option.count} 本）</option>`
+    ).join('');
+  filterAge.disabled = options.length === 0;
+}
 
-  booksData.forEach(book => {
-    similarTitleKey.set(book, titleGroups.seriesKey(book.title));
+function selectedGradeBooks() {
+  const filters = catalogFilters();
+  return filters ? filters.filterByGrade(booksData, filterAge.value) : [...booksData];
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
+function bookCardHtml(book) {
+  const title = escapeHtml(book.title || '未命名書籍');
+  const link = String(book.link || '').trim();
+  const titleHtml = link
+    ? `<a href="${escapeHtml(link)}" target="_blank" rel="noopener" class="book-title">${title}</a>`
+    : `<span class="book-title">${title}</span>`;
+  const isCertified = book.certified === true || book.certified === 1 || book.certified === 'true';
+  const ageGroup = book.age_group || book.range || '未提供';
+
+  return `<article class="book-card">
+    <div class="book-header">
+      ${titleHtml}
+      <span class="badge ${isCertified ? 'badge-success' : 'badge-danger'}">${isCertified ? '可認證' : '不可認證'}</span>
+    </div>
+    <div class="book-details">
+      <div class="detail-item"><strong>作者：</strong>${escapeHtml(book.author || '未知')}</div>
+      <div class="detail-item"><strong>適讀：</strong>${escapeHtml(ageGroup)}</div>
+      <div class="detail-item" style="grid-column: span 2;"><strong>出版社：</strong>${escapeHtml(book.publisher || '無')}</div>
+    </div>
+  </article>`;
+}
+
+function renderGroups(sourceBooks) {
+  const filters = catalogFilters();
+  const groups = filters ? filters.buildSimilarTitleGroups(sourceBooks) : [];
+
+  groupsSection.classList.toggle('hidden', groups.length === 0);
+  groupsList.innerHTML = groups.map((group, index) => `
+    <article class="group-card">
+      <button type="button" class="group-toggle-btn" data-group-index="${index}" aria-expanded="false">
+        <span>${escapeHtml(group.label)} <span class="group-count-tag">${group.count} 本</span></span>
+        <span class="group-arrow">▼</span>
+      </button>
+      <div class="group-items hidden" id="group-${index}">
+        ${group.books.map(bookCardHtml).join('')}
+      </div>
+    </article>
+  `).join('');
+
+  groupsList.querySelectorAll('button[data-group-index]').forEach(button => {
+    button.addEventListener('click', () => {
+      const target = document.getElementById(`group-${button.dataset.groupIndex}`);
+      const isHidden = target.classList.toggle('hidden');
+      button.setAttribute('aria-expanded', (!isHidden).toString());
+    });
   });
-
-  groups.forEach(group => {
-    const option = document.createElement('option');
-    option.value = group.key;
-    option.textContent = `${group.label}（${group.count} 本）`;
-    options.appendChild(option);
-  });
-
-  filterTitleGroup.appendChild(options);
-  filterTitleGroup.disabled = groups.length === 0;
 }
 
 // 2. 顯示 Toast 訊息
@@ -140,8 +196,7 @@ function showToast(message, type = 'info') {
 // 3. 處理搜尋與篩選邏輯
 function applyFiltersAndSearch() {
   const query = searchInput.value.trim();
-  const ageFilter = filterAge.value;
-  const titleGroupFilter = filterTitleGroup.value;
+  const gradeBooks = selectedGradeBooks();
 
   // 顯示清除按鈕
   clearBtn.style.display = query ? 'block' : 'none';
@@ -151,25 +206,25 @@ function applyFiltersAndSearch() {
   if (query && fuseInstance) {
     const normalizedQuery = normalizeSearchText(query);
     const directMatches = normalizedQuery
-      ? booksData.filter(book => searchableText.get(book).includes(normalizedQuery))
+      ? gradeBooks.filter(book => searchableText.get(book).includes(normalizedQuery))
       : [];
+    const gradeBookSet = new Set(gradeBooks);
 
     // 大多數書名查詢可用一次線性比對完成；只有無直接命中時才做較昂貴的模糊搜尋。
     results = directMatches.length > 0
       ? directMatches
-      : fuseInstance.search(query).map(result => result.item);
+      : fuseInstance.search(query)
+        .map(result => result.item)
+        .filter(book => gradeBookSet.has(book));
   } else {
-    results = [...booksData];
+    results = [...gradeBooks];
   }
 
-  // 第二階段：適讀年段篩選
-  if (ageFilter) {
-    results = results.filter(book => book.age_group.includes(ageFilter));
-  }
-
-  // 第三階段：相似書名群組篩選
-  if (titleGroupFilter) {
-    results = results.filter(book => similarTitleKey.get(book) === titleGroupFilter);
+  // 沒有搜尋文字時顯示目前年級的相似書名群組。
+  if (query) {
+    groupsSection.classList.add('hidden');
+  } else {
+    renderGroups(gradeBooks);
   }
 
   filteredBooks = results;
@@ -216,30 +271,7 @@ function renderResults() {
   }
 
   // 生成書籍卡片並加入容器
-  renderData.forEach(book => {
-    const card = document.createElement('div');
-    card.className = 'book-card';
-
-    const titleHtml = book.link
-      ? `<a href="${book.link}" target="_blank" class="book-title">${book.title}</a>`
-      : `<span class="book-title">${book.title}</span>`;
-
-    const badgeClass = book.certified ? 'badge-success' : 'badge-danger';
-    const badgeText = book.certified ? '可認證' : '不可認證';
-
-    card.innerHTML = `
-      <div class="book-header">
-        ${titleHtml}
-        <span class="badge ${badgeClass}">${badgeText}</span>
-      </div>
-      <div class="book-details">
-        <div class="detail-item"><strong>作者：</strong>${book.author || '未知'}</div>
-        <div class="detail-item"><strong>適讀：</strong>${book.age_group}</div>
-        <div class="detail-item" style="grid-column: span 2;"><strong>出版社：</strong>${book.publisher || '無'}</div>
-      </div>
-    `;
-    bookListContainer.appendChild(card);
-  });
+  bookListContainer.innerHTML = renderData.map(bookCardHtml).join('');
 }
 
 // ============================================================
@@ -543,13 +575,6 @@ if (SpeechRecognition) {
 }
 
 filterAge.addEventListener('change', applyFiltersAndSearch);
-filterTitleGroup.addEventListener('change', () => {
-  // 群組選擇代表一次完整導覽，避免舊的關鍵字或年段條件隱藏群組成員。
-  window.clearTimeout(searchTimer);
-  searchInput.value = '';
-  filterAge.value = '';
-  applyFiltersAndSearch();
-});
 displayMode.addEventListener('change', () => {
   currentPage = 1;
   renderResults();

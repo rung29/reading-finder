@@ -10,6 +10,46 @@
   const BARE_CHINESE_NUMBER_PATTERN = /\s*[零〇一二三四五六七八九十百千兩]+\s*$/u;
   const SPECIAL_VOLUME_PATTERN = /\s*(?:番外|特別|外傳)(?:篇|版)?\s*$/u;
   const MIN_SERIES_KEY_LENGTH = 3;
+  const GRADE_ORDER = [
+    "國小低年級",
+    "國小中年級",
+    "國小高年級",
+    "國中",
+    "高中",
+    "其他"
+  ];
+
+  function normalizeGrade(value) {
+    return String(value || "").normalize("NFKC").trim();
+  }
+
+  function bookGrade(book) {
+    return normalizeGrade(book && (book.age_group || book.range));
+  }
+
+  function gradeOptions(books) {
+    const counts = new Map();
+    (books || []).forEach((book) => {
+      const grade = bookGrade(book);
+      if (grade) counts.set(grade, (counts.get(grade) || 0) + 1);
+    });
+
+    return [...counts.entries()]
+      .map(([value, count]) => ({ value, label: value, count }))
+      .sort((left, right) => {
+        const leftIndex = GRADE_ORDER.indexOf(left.value);
+        const rightIndex = GRADE_ORDER.indexOf(right.value);
+        const leftRank = leftIndex < 0 ? GRADE_ORDER.length : leftIndex;
+        const rightRank = rightIndex < 0 ? GRADE_ORDER.length : rightIndex;
+        return leftRank - rightRank || left.label.localeCompare(right.label, "zh-Hant");
+      });
+  }
+
+  function filterByGrade(books, selectedGrade) {
+    const grade = normalizeGrade(selectedGrade);
+    if (!grade) return [...(books || [])];
+    return (books || []).filter((book) => bookGrade(book) === grade);
+  }
 
   function cleanTitleText(title) {
     return String(title || "")
@@ -104,12 +144,23 @@
       .map(([key, groupBooks]) => ({
         key,
         label: preferredLabel(groupBooks),
-        count: groupBooks.length
+        count: groupBooks.length,
+        books: groupBooks
       }))
-      .sort((left, right) => left.label.localeCompare(right.label, "zh-Hant"));
+      .sort((left, right) => {
+        return right.count - left.count
+          || left.label.localeCompare(right.label, "zh-Hant");
+      });
   }
 
-  const api = { normalizeSimilarTitle, seriesKey, buildSimilarTitleGroups };
+  const api = {
+    normalizeGrade,
+    gradeOptions,
+    filterByGrade,
+    normalizeSimilarTitle,
+    seriesKey,
+    buildSimilarTitleGroups
+  };
   global.ReadingFinderTitleGroups = api;
 
   if (typeof module !== "undefined" && module.exports) {

@@ -2,6 +2,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  gradeOptions,
+  filterByGrade,
   normalizeSimilarTitle,
   seriesKey,
   buildSimilarTitleGroups
@@ -49,12 +51,14 @@ test('merges numbered series with colon subtitles', () => {
     '少年廚俠5：陰謀與真相'
   ];
 
+  const books = titles.map(title => ({ title }));
+  const [group] = buildSimilarTitleGroups(books);
+
   assert.equal(new Set(titles.map(seriesKey)).size, 1);
-  assert.deepEqual(buildSimilarTitleGroups(titles.map(title => ({ title })))[0], {
-    key: '少年廚俠',
-    label: '少年廚俠',
-    count: 5
-  });
+  assert.equal(group.key, '少年廚俠');
+  assert.equal(group.label, '少年廚俠');
+  assert.equal(group.count, 5);
+  assert.deepEqual(group.books, books);
 });
 
 test('merges a series whose books differ only by colon subtitles', () => {
@@ -67,4 +71,21 @@ test('merges a series whose books differ only by colon subtitles', () => {
 test('merges series whose volume number is at the end', () => {
   assert.equal(seriesKey('少年廚俠1'), seriesKey('少年廚俠5'));
   assert.equal(seriesKey('漫畫科學王第1冊'), seriesKey('漫畫科學王第2冊'));
+});
+
+test('builds and filters grade options', () => {
+  const books = [
+    { title: '低年級書', age_group: '國小低年級' },
+    { title: '低年級書 2', age_group: '國小低年級' },
+    { title: '中年級書', age_group: '國小中年級' }
+  ];
+
+  assert.deepEqual(
+    gradeOptions(books).map(({ value, count }) => ({ value, count })),
+    [
+      { value: '國小低年級', count: 2 },
+      { value: '國小中年級', count: 1 }
+    ]
+  );
+  assert.deepEqual(filterByGrade(books, '國小低年級'), books.slice(0, 2));
 });
