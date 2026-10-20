@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reading-finder-v13';
+const CACHE_NAME = 'reading-finder-v14';
 const ASSETS = [
   './',
   './index.html',
@@ -15,10 +15,13 @@ const ASSETS = [
 // 安裝 Service Worker 並快取靜態資源
 self.addEventListener('install', (e) => {
   e.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('[Service Worker] Caching all assets');
-      return cache.addAll(ASSETS);
-    })
+    Promise.all([
+      self.skipWaiting(),
+      caches.open(CACHE_NAME).then((cache) => {
+        console.log('[Service Worker] Caching all assets');
+        return cache.addAll(ASSETS);
+      })
+    ])
   );
 });
 
@@ -33,7 +36,7 @@ self.addEventListener('activate', (e) => {
             return caches.delete(key);
           }
         })
-      );
+      ).then(() => self.clients.claim());
     })
   );
 });
