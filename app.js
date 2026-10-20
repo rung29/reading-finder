@@ -55,8 +55,13 @@ const GEMINI_MODEL_STORAGE_KEY = 'vision_gemini_model';
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
 const GEMINI_MODEL_VALUES = [
   'gemini-2.5-flash',
+  'gemini-3.8-flash',
+  'gemini-3.6-flash',
   'gemini-2.5-flash-lite',
-  'gemini-2.5-pro'
+  'gemini-3.5-flash-lite',
+  'gemini-3.1-flash-lite',
+  'gemma-4-26b-a4b-it',
+  'gemma-4-31b-it'
 ];
 
 // 1. 初始化載入書籍資料

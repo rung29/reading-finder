@@ -71,9 +71,9 @@
 
 ## 📷 拍照辨識功能 (OCR) 說明
 
-本系統預設使用 **Google AI Studio Gemini 2.5 Flash** 提供繁體中文辨識能力，也可在設定視窗切換 Gemini 2.5 Flash-Lite 或 Gemini 2.5 Pro：
+本系統預設使用 **Google AI Studio Gemini 2.5 Flash** 提供繁體中文辨識能力，也可在設定視窗切換其他 Gemini Flash、Flash-Lite 或 Gemma 4 模型：
 
 - **API 金鑰設定**：點擊網頁右上角的「⚙️ 設定」按鈕，輸入您的 Google AI Studio 金鑰。金鑰可至 [Google AI Studio](https://aistudio.google.com/app/apikey) 免費申請。您的金鑰僅會安全地儲存於手機瀏覽器本地（localStorage），不會上傳至任何第三方伺服器。
-- **模型設定**：在同一個設定視窗選擇模型；模型選擇會儲存於手機瀏覽器本地（localStorage），未選擇時預設使用 `gemini-2.5-flash`。
+- **模型設定**：在同一個設定視窗選擇模型；模型選擇會儲存於手機瀏覽器本地（localStorage），未選擇時預設使用 `gemini-2.5-flash`。可選模型包含 `gemini-3.8-flash`、`gemini-3.6-flash`、`gemini-2.5-flash-lite`、`gemini-3.5-flash-lite`、`gemini-3.1-flash-lite`、`gemma-4-26b-a4b-it` 與 `gemma-4-31b-it`。
 - **拍攝技巧**：點擊「拍照辨識」後，畫面會出現綠色的對焦掃描框。請將**書名**對準並儘可能填滿該對焦框後點擊拍攝。系統會自動擷取對焦框內的部分進行高精度辨識，避免周邊雜訊干擾。
 - **清除功能**：點擊搜尋框右側的 `×` 即可快速清空輸入內容並還原全部書籍清單。
