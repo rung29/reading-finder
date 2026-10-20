@@ -178,8 +178,19 @@ function renderGroups(sourceBooks) {
   groupsList.querySelectorAll('button[data-group-index]').forEach(button => {
     button.addEventListener('click', () => {
       const target = document.getElementById(`group-${button.dataset.groupIndex}`);
-      const isHidden = target.classList.toggle('hidden');
-      button.setAttribute('aria-expanded', (!isHidden).toString());
+      const shouldOpen = target.classList.contains('hidden');
+
+      groupsList.querySelectorAll('.group-items').forEach(item => {
+        item.classList.add('hidden');
+      });
+      groupsList.querySelectorAll('button[data-group-index]').forEach(otherButton => {
+        otherButton.setAttribute('aria-expanded', 'false');
+      });
+
+      if (shouldOpen) {
+        target.classList.remove('hidden');
+        button.setAttribute('aria-expanded', 'true');
+      }
     });
   });
 }
